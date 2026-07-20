@@ -29,5 +29,6 @@
     "modules/sources/main/**/*.ts",
     "modules/persistence/main/**/*.ts",
     "electron.vite.config.ts"
-  ]
+  ],
+  "exclude": ["**/*.test.ts"]
 }

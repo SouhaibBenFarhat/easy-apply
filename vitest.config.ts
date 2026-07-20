@@ -33,8 +33,6 @@ export default defineConfig({
       'src/renderer/**/*.test.{ts,tsx}',
       'modules/**/*.test.{ts,tsx}',
     ],
-    // P0 only — removed in PR 1 when the first real tests land.
-    passWithNoTests: true,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json-summary', 'cobertura', 'html'],
@@ -48,9 +46,12 @@ export default defineConfig({
         'src/renderer/main.tsx',
         'modules/test-utils/**',
       ],
-      // P0 only — the 85% global thresholds are restored in PR 1 alongside
-      // the first real tests (an empty suite reports 0% and would fail CI).
-      // thresholds: { branches: 85, functions: 85, lines: 85, statements: 85 },
+      thresholds: {
+        branches: 85,
+        functions: 85,
+        lines: 85,
+        statements: 85,
+      },
     },
   },
 })
