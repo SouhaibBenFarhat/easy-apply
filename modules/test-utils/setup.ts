@@ -10,6 +10,9 @@ class ResizeObserverMock {
 globalThis.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver
 
 beforeEach(() => {
+  // Node-environment suites (e.g. modules/persistence, which runs PGlite via
+  // `@vitest-environment node`) have no DOM to reset.
+  if (typeof window === 'undefined') return
   localStorage.clear()
   setupMockElectron()
 })

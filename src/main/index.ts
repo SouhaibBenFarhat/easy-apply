@@ -1,12 +1,16 @@
 import { join } from 'node:path'
+import { type AppDatabase, createDatabase } from '@persistence/main'
 import { app, BrowserWindow } from 'electron'
+import { registerDbIpc } from './ipc/db'
 import { registerSettingsIpc } from './ipc/settings'
 import { installMenu } from './menu'
 import { installContentSecurityPolicy, installWindowGuards } from './security'
 import { store } from './store'
 
-// Kept intentionally thin (PLAN.md §4.1): window/lifecycle/menu/security here;
-// sync engine and persistence IPC arrive in PRs 4–9.
+// Kept intentionally thin (PLAN.md §4.1): window/lifecycle/menu/security and
+// persistence wiring here; the sync engine arrives in PR 9.
+
+let db: AppDatabase | undefined
 
 function createWindow(): void {
   const bounds = store.get('windowBounds')
@@ -41,14 +45,27 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   installContentSecurityPolicy()
   installMenu()
   registerSettingsIpc()
+  // Dev vs packaged migrations path — the classic Electron trap (PLAN.md §4.5):
+  // packaged builds read the drizzle/ folder shipped via extraResources.
+  db = await createDatabase({
+    dataDir: join(app.getPath('userData'), 'easyapply-db'),
+    migrationsFolder: app.isPackaged
+      ? join(process.resourcesPath, 'drizzle')
+      : join(app.getAppPath(), 'drizzle'),
+  })
+  registerDbIpc(db)
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+})
+
+app.on('will-quit', () => {
+  void db?.close()
 })
 
 app.on('window-all-closed', () => {
