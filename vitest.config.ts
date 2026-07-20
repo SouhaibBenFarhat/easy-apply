@@ -41,8 +41,10 @@ export default defineConfig({
         '**/*.d.ts',
         '**/*.test.{ts,tsx}',
         '**/types.ts',
-        'src/main/index.ts',
-        'src/preload/index.ts',
+        // Electron glue (BrowserWindow/ipcMain/contextBridge wiring) cannot run
+        // under vitest — pure logic lives in modules/** where it IS covered.
+        'src/main/**',
+        'src/preload/**',
         'src/renderer/main.tsx',
         'modules/test-utils/**',
       ],

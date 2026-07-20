@@ -81,8 +81,12 @@ jobs:
         run: |
           pip install diff-cover
           git fetch origin ${{ github.base_ref }}
+          # Electron glue (src/main, src/preload) is excluded from coverage
+          # instrumentation entirely — mirror that here or diff-cover counts
+          # those changed lines as uncovered.
           diff-cover coverage/cobertura-coverage.xml \
             --compare-branch=origin/${{ github.base_ref }} \
+            --exclude "src/main/**" "src/preload/**" "src/renderer/main.tsx" \
             --fail-under=90
 
   # Aggregate gate — the required branch-protection check. Keep the name
