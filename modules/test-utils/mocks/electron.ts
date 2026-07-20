@@ -1,18 +1,108 @@
+import type { FeedFilters, StoredJob } from '@sources/shared'
 import { DEFAULT_SEARCH_PROFILE } from '@sources/shared'
-import type { AppSettings, ElectronAPI } from '../../../src/preload/electron-api'
+import type { AppSettings, ElectronAPI, ProviderState } from '../../../src/preload/electron-api'
 
 // Full window.electron mock surface. Grown alongside the real preload bridge
-// so component tests never touch real IPC.
-export function createMockElectron(): ElectronAPI {
+// so component tests never touch real IPC. The db namespace is a working
+// in-memory fake (plain arrays, no PGlite) that mirrors the repository
+// semantics: feed ordering, filters, preserved lifecycle fields.
+
+export interface MockElectronSeed {
+  jobs?: StoredJob[]
+  providers?: ProviderState[]
+}
+
+function feedOrder(a: StoredJob, b: StoredJob): number {
+  // posted_at desc nulls last, then first_seen_at desc — same as listFeed.
+  if (a.postedAt !== b.postedAt) {
+    if (a.postedAt === null) return 1
+    if (b.postedAt === null) return -1
+    return a.postedAt < b.postedAt ? 1 : -1
+  }
+  return a.firstSeenAt < b.firstSeenAt ? 1 : a.firstSeenAt > b.firstSeenAt ? -1 : 0
+}
+
+function applyFeedFilters(rows: StoredJob[], filters: FeedFilters): StoredJob[] {
+  let out = rows.filter((job) => {
+    if (filters.workModes && !filters.workModes.includes(job.workMode)) return false
+    if (
+      filters.remoteScopes &&
+      (job.remoteScope === null || !filters.remoteScopes.includes(job.remoteScope))
+    )
+      return false
+    if (filters.sources && !filters.sources.includes(job.sourceId)) return false
+    if (filters.hasSalary === true && job.salary.min === null && job.salary.max === null)
+      return false
+    if (filters.search !== undefined && filters.search.trim() !== '') {
+      const needle = filters.search.trim().toLowerCase()
+      if (!job.title.toLowerCase().includes(needle) && !job.company.toLowerCase().includes(needle))
+        return false
+    }
+    if (filters.status !== undefined) {
+      if (filters.status === 'none' ? job.status !== null : job.status !== filters.status)
+        return false
+    }
+    if (filters.includeHidden !== true && job.hidden) return false
+    return true
+  })
+  out = out.toSorted(feedOrder)
+  const offset = filters.offset ?? 0
+  return out.slice(offset, offset + (filters.limit ?? 200))
+}
+
+export function createMockElectron(seed: MockElectronSeed = {}): ElectronAPI {
   const settings: AppSettings = {
     searchProfile: DEFAULT_SEARCH_PROFILE,
     syncIntervalHours: 3,
   }
+  const jobs: StoredJob[] = (seed.jobs ?? []).map((job) => ({ ...job }))
+  const providers: ProviderState[] = (seed.providers ?? []).map((state) => ({ ...state }))
+
+  const findJob = (id: string): StoredJob | undefined => jobs.find((job) => job.id === id)
+
   return {
     platform: 'darwin',
     settings: {
       get: async () => ({ success: true, data: settings }),
       set: async (update) => ({ success: true, data: { ...settings, ...update } }),
+    },
+    db: {
+      jobs: {
+        list: async (filters = {}) => ({ success: true, data: applyFeedFilters(jobs, filters) }),
+        get: async (id) => ({ success: true, data: findJob(id) ?? null }),
+        setStatus: async (id, status) => {
+          const job = findJob(id)
+          if (job === undefined) return { success: true, data: null }
+          job.status = status
+          job.statusUpdatedAt = new Date().toISOString()
+          return { success: true, data: { ...job } }
+        },
+        setNotes: async (id, notes) => {
+          const job = findJob(id)
+          if (job === undefined) return { success: true, data: null }
+          job.notes = notes
+          return { success: true, data: { ...job } }
+        },
+        setHidden: async (id, hidden) => {
+          const job = findJob(id)
+          if (job === undefined) return { success: true, data: null }
+          job.hidden = hidden
+          return { success: true, data: { ...job } }
+        },
+      },
+      providers: {
+        list: async () => ({ success: true, data: providers.map((state) => ({ ...state })) }),
+        setEnabled: async (sourceId, enabled) => {
+          let state = providers.find((entry) => entry.sourceId === sourceId)
+          if (state === undefined) {
+            state = { sourceId, enabled, lastSyncAt: null, configJson: null }
+            providers.push(state)
+          } else {
+            state.enabled = enabled
+          }
+          return { success: true, data: { ...state } }
+        },
+      },
     },
   }
 }
