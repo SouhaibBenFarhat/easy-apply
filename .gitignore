@@ -1,0 +1,10 @@
+node_modules/
+out/
+dist/
+coverage/
+.typecheck-temp/
+.vitest-reports/
+.DS_Store
+*.log
+.env
+.env.*

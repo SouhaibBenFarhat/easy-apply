@@ -1,0 +1,58 @@
+{
+  "name": "easy-apply",
+  "version": "0.1.0",
+  "description": "EasyApply — job postings aggregator for macOS. Munich + remote-EU jobs in one fast feed.",
+  "type": "module",
+  "main": "./out/main/index.js",
+  "author": "Souhaib Ben Farhat",
+  "license": "MIT",
+  "private": true,
+  "packageManager": "pnpm@10.18.2",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "npm run generate:theme && electron-vite build",
+    "typecheck": "tsc -p tsconfig.web.json --emitDeclarationOnly --outDir .typecheck-temp && tsc --noEmit -p tsconfig.node.json && rm -rf .typecheck-temp",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "generate:theme": "node scripts/generate-theme.mjs",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.4",
+    "@testing-library/jest-dom": "^7.0.0",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "autoprefixer": "^10.5.4",
+    "electron": "^43.1.1",
+    "electron-vite": "^5.0.0",
+    "happy-dom": "^20.11.0",
+    "husky": "^9.1.7",
+    "postcss": "^8.5.20",
+    "tailwindcss": "^3.4.19",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.6",
+    "vitest": "^4.1.10"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild"
+    ]
+  }
+}

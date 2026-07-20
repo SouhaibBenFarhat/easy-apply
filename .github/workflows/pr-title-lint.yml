@@ -1,0 +1,33 @@
+name: PR title
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+jobs:
+  lint-title:
+    name: Validate PR title
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      # Squash-merge uses the PR title as the commit message, and Release
+      # Drafter derives semver + release notes from it — keep titles clean.
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            chore
+            ci
+            build
+            refactor
+            perf
+            test
+            style
+            revert
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: The subject must start with a lowercase letter.

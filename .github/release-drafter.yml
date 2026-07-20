@@ -1,0 +1,50 @@
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+change-template: '- $TITLE (#$NUMBER) @$AUTHOR'
+change-title-escapes: '\<*_&'
+
+categories:
+  - title: '🚀 Features'
+    labels: [feature]
+  - title: '🐛 Fixes'
+    labels: [fix]
+  - title: '🧹 Maintenance'
+    labels: [maintenance]
+
+version-resolver:
+  major:
+    labels: [breaking]
+  minor:
+    labels: [feature]
+  patch:
+    labels: [fix, maintenance]
+  default: patch
+
+autolabeler:
+  - label: feature
+    title: ['/^feat(\(.+\))?!?:/i']
+  - label: fix
+    title: ['/^fix(\(.+\))?!?:/i']
+  - label: maintenance
+    title: ['/^(chore|ci|build|docs|refactor|perf|test|style|revert)(\(.+\))?!?:/i']
+  - label: breaking
+    title: ['/^[a-z]+(\(.+\))?!:/i']
+    body: ['/BREAKING CHANGE/']
+
+template: |
+  ## What's Changed
+
+  $CHANGES
+
+  **Full Changelog**: https://github.com/SouhaibBenFarhat/easy-apply/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
+
+  ### 📦 Install (macOS, Apple Silicon)
+
+  ```bash
+  brew install --cask souhaibbenfarhat/tap/easyapply
+  # already installed?
+  brew upgrade --cask easyapply
+  ```
+
+  Manual install: download `EasyApply-arm64.dmg` below, drag to Applications, then run
+  `xattr -dr com.apple.quarantine /Applications/EasyApply.app` (the build is not notarized).

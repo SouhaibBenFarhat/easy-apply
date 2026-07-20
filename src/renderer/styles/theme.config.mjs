@@ -1,0 +1,97 @@
+// Single source of truth for the color system.
+// Edit values here, then run `pnpm generate:theme` — never edit the GENERATED
+// blocks in globals.css by hand.
+//
+// P0 note: these are neutral placeholder values so the pipeline is green from
+// the first commit. PR 1 replaces them with the VZ5 palette (petrol hue ≈ 215,
+// copper primary hue ≈ 60) per PLAN.md §5.1.
+
+export const roles = {
+  neutral: { hue: 250 },
+  primary: { hue: 250 },
+  success: { hue: 155 },
+  warning: { hue: 95 },
+  destructive: { hue: 27 },
+  info: { hue: 230 },
+}
+
+// Elevation rule (validated by the generator):
+// light mode — higher elevation is DARKER (background is the lightest thing on screen)
+// dark mode  — higher elevation is LIGHTER (background is the darkest)
+export const lightTokens = {
+  background: { role: 'neutral', l: 1.0, c: 0 },
+  'surface-content': { role: 'neutral', l: 0.978, c: 0.004 },
+  surface: { role: 'neutral', l: 0.958, c: 0.006 },
+  'surface-raised': { role: 'neutral', l: 0.944, c: 0.007 },
+  'surface-hover': { role: 'neutral', l: 0.93, c: 0.008 },
+  header: { role: 'neutral', l: 0.85, c: 0.008 },
+  overlay: { role: 'neutral', l: 1.0, c: 0 },
+  foreground: { role: 'neutral', l: 0.175, c: 0.01 },
+  'foreground-muted': { role: 'neutral', l: 0.47, c: 0.012 },
+  'foreground-subtle': { role: 'neutral', l: 0.6, c: 0.01 },
+  'foreground-ghost': { role: 'neutral', l: 0.7, c: 0.008 },
+  border: { role: 'neutral', l: 0.86, c: 0.008 },
+  'border-muted': { role: 'neutral', l: 0.89, c: 0.006 },
+  'border-subtle': { role: 'neutral', l: 0.92, c: 0.005 },
+  'interactive-hover': { role: 'neutral', l: 0.93, c: 0.008 },
+  'interactive-active': { role: 'neutral', l: 0.9, c: 0.01 },
+  primary: { role: 'primary', l: 0.59, c: 0.19 },
+  'primary-foreground': { role: 'neutral', l: 0.995, c: 0 },
+  input: { role: 'neutral', l: 0.958, c: 0.006 },
+  ring: { role: 'primary', l: 0.59, c: 0.19 },
+  success: { role: 'success', l: 0.52, c: 0.12 },
+  'success-foreground': { role: 'neutral', l: 0.995, c: 0 },
+  'success-subtle': { role: 'success', l: 0.95, c: 0.03 },
+  'success-border': { role: 'success', l: 0.85, c: 0.06 },
+  warning: { role: 'warning', l: 0.65, c: 0.12 },
+  'warning-foreground': { role: 'neutral', l: 0.2, c: 0.01 },
+  'warning-subtle': { role: 'warning', l: 0.96, c: 0.04 },
+  'warning-border': { role: 'warning', l: 0.87, c: 0.08 },
+  destructive: { role: 'destructive', l: 0.55, c: 0.18 },
+  'destructive-foreground': { role: 'neutral', l: 0.995, c: 0 },
+  'destructive-subtle': { role: 'destructive', l: 0.95, c: 0.03 },
+  'destructive-border': { role: 'destructive', l: 0.86, c: 0.08 },
+  info: { role: 'info', l: 0.55, c: 0.14 },
+  'info-foreground': { role: 'neutral', l: 0.995, c: 0 },
+  'info-subtle': { role: 'info', l: 0.95, c: 0.03 },
+  'info-border': { role: 'info', l: 0.86, c: 0.07 },
+}
+
+export const darkTokens = {
+  background: { role: 'neutral', l: 0.145, c: 0.005 },
+  'surface-content': { role: 'neutral', l: 0.16, c: 0.006 },
+  surface: { role: 'neutral', l: 0.185, c: 0.007 },
+  'surface-raised': { role: 'neutral', l: 0.202, c: 0.008 },
+  'surface-hover': { role: 'neutral', l: 0.222, c: 0.009 },
+  header: { role: 'neutral', l: 0.31, c: 0.01 },
+  overlay: { role: 'neutral', l: 0.275, c: 0.008 },
+  foreground: { role: 'neutral', l: 0.96, c: 0.005 },
+  'foreground-muted': { role: 'neutral', l: 0.625, c: 0.01 },
+  'foreground-subtle': { role: 'neutral', l: 0.52, c: 0.01 },
+  'foreground-ghost': { role: 'neutral', l: 0.42, c: 0.01 },
+  border: { role: 'neutral', l: 0.29, c: 0.01 },
+  'border-muted': { role: 'neutral', l: 0.245, c: 0.009 },
+  'border-subtle': { role: 'neutral', l: 0.215, c: 0.008 },
+  'interactive-hover': { role: 'neutral', l: 0.24, c: 0.01 },
+  'interactive-active': { role: 'neutral', l: 0.27, c: 0.012 },
+  primary: { role: 'primary', l: 0.59, c: 0.19 },
+  'primary-foreground': { role: 'neutral', l: 0.995, c: 0 },
+  input: { role: 'neutral', l: 0.185, c: 0.007 },
+  ring: { role: 'primary', l: 0.59, c: 0.19 },
+  success: { role: 'success', l: 0.7, c: 0.13 },
+  'success-foreground': { role: 'neutral', l: 0.13, c: 0.005 },
+  'success-subtle': { role: 'success', l: 0.25, c: 0.04 },
+  'success-border': { role: 'success', l: 0.38, c: 0.07 },
+  warning: { role: 'warning', l: 0.75, c: 0.13 },
+  'warning-foreground': { role: 'neutral', l: 0.13, c: 0.005 },
+  'warning-subtle': { role: 'warning', l: 0.26, c: 0.04 },
+  'warning-border': { role: 'warning', l: 0.4, c: 0.08 },
+  destructive: { role: 'destructive', l: 0.62, c: 0.17 },
+  'destructive-foreground': { role: 'neutral', l: 0.995, c: 0 },
+  'destructive-subtle': { role: 'destructive', l: 0.24, c: 0.05 },
+  'destructive-border': { role: 'destructive', l: 0.38, c: 0.09 },
+  info: { role: 'info', l: 0.65, c: 0.13 },
+  'info-foreground': { role: 'neutral', l: 0.13, c: 0.005 },
+  'info-subtle': { role: 'info', l: 0.25, c: 0.04 },
+  'info-border': { role: 'info', l: 0.39, c: 0.08 },
+}

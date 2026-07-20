@@ -1,0 +1,189 @@
+{
+ "research": {
+  "sources": [
+   {
+    "name": "Bundesagentur für Arbeit 'Jobsuche' API (anchor source)",
+    "access": "official API (public static key)",
+    "effort": "low",
+    "endpoint": "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/pc/v6/jobs",
+    "docsUrl": "https://jobsuche.api.bund.dev/ (community docs: https://github.com/bundesAPI/jobsuche-api)",
+    "detail": "LIVE-VERIFIED 2026-07-20. Auth: single static header `X-API-Key: jobboerse-jobsuche` — no registration, no OAuth (the old client-credentials flow from early bundesAPI docs is obsolete). Current search version is v6; job details remain at v4: GET https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/pc/v4/jobdetails/{base64url(refnr)}. Query params: `was` (keywords), `wo` (free-text location, e.g. München), `umkreis` (radius in km, 0–200), `page`/`size` (pagination), `angebotsart` (1=job, 4=apprenticeship), `befristung` (1=fixed-term, 2=permanent), `arbeitszeit` (vz;tz;snw;mj), `veroeffentlichtseit` (days), `arbeitgeber`, `pav`. Remote filtering (empirically verified, differs from community docs): the documented `arbeitszeit=ho` value is unreliable in v6 (returned 0 hits for Munich software jobs); `homeoffice=true` returns HTTP 500; the WORKING filter is `homeoffice=nv_true` — for `was=software&wo=München&umkreis=25` it returned exactly the 318 jobs shown in the response's `facetten.homeoffice.counts.nv_true` (of 1689 total). Response JSON: `{ergebnisliste: [...], maxErgebnisse, page, size, woOutput, facetten}`; each job has `stellenangebotsTitel`, `firma`, `referenznummer`, `stellenlokationen` (plz/ort/region + `entfernung` km from search center), `homeofficemoeglich` (boolean — also usable for client-side filtering), `arbeitszeitVollzeit` etc., `externeURL`, `vertragsdauer`, `eintrittszeitraum`, `verguetungsangabe`. Salary: effectively absent — `verguetungsangabe` was 'KEINE_ANGABEN' on sampled jobs; a `verguetung` facet exists but German employers rarely state pay (see payTransparency). Rate limits: none documented; be polite (a personal app polling a few times/day is far below any observed throttling). Stability: the API is unofficial-but-tolerated (it powers arbeitsagentur.de's own job search); the v4→v6 rename of response fields shows it does change without notice — validate responses with zod and pin to observed field names, not community docs."
+   },
+   {
+    "name": "Arbeitnow",
+    "access": "official API (free, no auth)",
+    "effort": "low",
+    "endpoint": "https://www.arbeitnow.com/api/job-board-api",
+    "docsUrl": "https://www.arbeitnow.com/api/job-board-api (guide: https://www.arbeitnow.com/blog/job-board-api)",
+    "detail": "LIVE-VERIFIED 2026-07-20. GET, no key. Params: `page` (100 jobs/page, Laravel-style `links.next`/`meta` pagination) and `search` (keyword — observed working in live response links, e.g. ?search=Software%20Engineer). Job fields: slug, company_name, title, description (HTML), remote (boolean), url, tags, job_types, location (city string), created_at (unix). Strongly German-focused: sampled page contained Munich, Nuremberg, Frankfurt, 'Deutschlandweit', etc. No location/radius server-side filter — filter client-side on `location` containing 'München'/'Munich' plus `remote===true`. Salary: NOT present in the current live payload; the older documented `visa_sponsorship` field is also gone. Updated hourly, ordered by created_at. Terms (embedded in `meta.terms`): free public API, don't abuse, link back appreciated. No published rate limit. Stability: good for years, but schema drifted (visa field removed) — validate."
+   },
+   {
+    "name": "Adzuna",
+    "access": "official API (free key)",
+    "effort": "low",
+    "endpoint": "https://api.adzuna.com/v1/api/jobs/de/search/{page}",
+    "docsUrl": "https://developer.adzuna.com/docs/search (ToS with limits: https://developer.adzuna.com/docs/terms_of_service)",
+    "detail": "Register at developer.adzuna.com for `app_id` + `app_key` (query params on every call). Germany is supported via country code `de` (Adzuna operates adzuna.de; 12+ country codes incl. de/at/gb/us/fr/pl); the /jobs/de/search/1 route is live (returns AUTH_FAIL without valid key, verified 2026-07-20). Params: what, what_exclude, where (e.g. München), distance (km — confirm exact unit in the interactive docs at developer.adzuna.com/activedocs after registering), salary_min, salary_max (as filters), full_time=1, permanent=1, sort_by (date|salary|relevance), results_per_page (max 50), max_days_old. Response (JSON; also XML): results[] with title, company.display_name, location.display_name + location.area[], salary_min, salary_max, salary_is_predicted ('1' when Adzuna's model estimated it), contract_type, contract_time, created, redirect_url, category. This is the ONLY Munich-relevant source with systematic salary numbers — but for Germany most are model-predicted, not employer-stated. Remote: no dedicated flag for de; use what='remote OR homeoffice' or filter titles/descriptions client-side. Free default rate limits (from ToS): 25 hits/min, 250/day, 1,000/week, 2,500/month — ample for personal use. Attribution: 'Jobs by Adzuna' logo/link required when republishing listings; personal research use is explicitly permitted. Stable, commercial-grade API."
+   },
+   {
+    "name": "Jooble",
+    "access": "official API (free key via form)",
+    "effort": "medium",
+    "endpoint": "POST https://jooble.org/api/{api_key}",
+    "docsUrl": "https://jooble.org/api/about (REST docs: https://help.jooble.org/en/support/solutions/articles/60001448238-rest-api-documentation)",
+    "detail": "Key requires filling a form (name, position, email, website, phone) at jooble.org/api/about — usually granted quickly, free. Single endpoint: POST JSON body to https://jooble.org/api/{key}. Body params: keywords (required), location (required, e.g. 'München' — de.jooble.org covers Germany), radius (km, allowed values 0/4/8/16/26/40/80), salary (integer minimum), page, ResultOnPage. Response JSON: totalCount + jobs[] {title, location, snippet (HTML), salary (string, often empty for DE), source (origin board name), type, link, updated, id}. It's a meta-aggregator, so it surfaces StepStone/Indeed-type postings you can't get via API directly — useful gap-filler, but links go through jooble redirects and dedup against other sources is needed. Remote: no explicit flag — use keywords like 'remote'/'homeoffice'. Rate limits not published (key is per-site; personal volume fine). Stability: API unchanged for years."
+   },
+   {
+    "name": "RemoteOK",
+    "access": "official JSON endpoint (no auth)",
+    "effort": "low",
+    "endpoint": "https://remoteok.com/api",
+    "docsUrl": "https://remoteok.com/api (self-documenting; legal terms embedded in element [0] of the response)",
+    "detail": "LIVE-VERIFIED 2026-07-20. Single GET returning an array: element [0] is a legal/ToS object ('link back with a follow link and mention Remote OK as source' or access is suspended) + last_updated timestamp; elements [1..~100] are the latest jobs with keys: id, slug, position, company, company_logo, location (free-text — filter client-side for 'Europe'/'Germany'/'Worldwide'; quality is messy, one sampled job had location 'Good Night, '), tags[], salary_min, salary_max (integers, USD, frequently 0 = not stated), description (HTML), date/epoch, url, apply_url. Also `?tag=dev`-style tag filtering and equivalent RSS at /remote-dev-jobs.rss. IMPORTANT for Electron: the endpoint returns 403 to default HTTP-library user agents — send a real browser User-Agent header (verified: curl with Chrome UA succeeds, plain fetch fails). No pagination (latest ~100 only) — poll a few times/day and store. No documented rate limit; stability good but treat fields defensively."
+   },
+   {
+    "name": "Remotive",
+    "access": "official API (no auth)",
+    "effort": "low",
+    "endpoint": "https://remotive.com/api/remote-jobs",
+    "docsUrl": "https://github.com/remotive-io/remote-jobs-api (remotive.com/api-documentation redirects here)",
+    "detail": "GET, no key. Params: category (e.g. software-dev), search (title+description), company_name, limit. Response JSON: job-count + jobs[] {id, url, title, company_name, company_logo, category, job_type, publication_date, candidate_required_location (KEY FIELD — filter for 'Germany', 'Europe', 'EMEA', 'Worldwide'), salary (free-text range, USD, optional), description (HTML)}. Hard usage rules from official docs: data is delayed 24h; poll max ~4 times/day; more than 2 requests/minute gets you BLOCKED; must link back to the Remotive URL and credit Remotive; collecting emails from the data is a terms breach. Perfect fit for a low-volume personal app: fetch 2–4x daily, cache locally. Stable for years."
+   },
+   {
+    "name": "WeWorkRemotely (RSS)",
+    "access": "RSS",
+    "effort": "low",
+    "endpoint": "https://weworkremotely.com/remote-jobs.rss (all jobs); per category e.g. https://weworkremotely.com/categories/remote-programming-jobs.rss",
+    "docsUrl": "https://weworkremotely.com/remote-job-rss-feed (feed directory; page itself 403s bots but the feeds work)",
+    "detail": "LIVE-VERIFIED 2026-07-20: all-jobs feed returned 96 items; category feed (remote-programming-jobs.rss, also remote-full-stack-programming-jobs.rss, remote-devops-sysadmin-jobs.rss, remote-back-end-programming-jobs.rss, etc.) returned 16. Item fields: title ('Company: Role'), custom <region> element (verified values: 'Anywhere in the World' ~74%, plus US-state restrictions — filter on region for Europe-eligible jobs; note WWR rarely tags 'Europe only' explicitly, so 'Anywhere in the World' is your usable bucket), <category>, HTML description, media:content logo, pubDate, link/guid. Salary: almost never structured — 1 of 16 sampled items had a range, inside the description text only. Requires a browser-like User-Agent (default clients get 403 — verified). No auth, no documented poll limit; a few fetches/day is fine. rss-parser handles the custom fields via customFields config."
+   },
+   {
+    "name": "Himalayas",
+    "access": "official API (no auth)",
+    "effort": "low",
+    "endpoint": "https://himalayas.app/jobs/api (browse) and https://himalayas.app/jobs/api/search (filtered)",
+    "docsUrl": "https://himalayas.app/api",
+    "detail": "No authentication. Browse endpoint: offset + limit (max 20/request). Search endpoint params: q (keywords), country (ISO alpha-2 — `country=DE` gives remote jobs open to Germany; this is the best server-side 'remote in Germany' filter of ALL sources surveyed), worldwide / exclude_worldwide flags, seniority, employment_type, timezone (UTC offsets), company, sort (relevant|recent|salaryAsc|salaryDesc|nameAToZ|jobs), page. Response fields: title, excerpt, companyName, companySlug, companyLogo, employmentType, locationRestrictions[] (countries), timezoneRestriction[], category, minSalary, maxSalary, salaryPeriod, currency (structured salary data when available — plus salary sorting), description (HTML), pubDate, expiryDate, applicationLink, guid. Rate limited (429 on excess; exact numbers unpublished — the 20-item page cap means syncing needs several sequential calls; space them out). Attribution required: link back to the Himalayas URL and credit Himalayas as source."
+   },
+   {
+    "name": "The Muse",
+    "access": "official API (key optional)",
+    "effort": "low",
+    "endpoint": "https://www.themuse.com/api/public/jobs?page=N",
+    "docsUrl": "https://www.themuse.com/developers/api/v2",
+    "detail": "GET, JSON, 20 results/page, `page` required. Without a key: 500 requests/hour; with a free registered key: 3,600/hour (X-RateLimit-* headers returned). Params: category (e.g. 'Software Engineering'), level, company, location — location accepts city strings ('Munich, Germany' has some coverage from international employers) and the special value 'Flexible / Remote' for remote roles; multiple values OR-combine. Response: results[] with name, company, locations[], levels[], refs.landing_page, contents (HTML), publication_date. NO salary fields. Coverage is US-centric curated employers — treat as a supplementary source; Munich/Germany yield will be modest. Stable, properly versioned official API."
+   },
+   {
+    "name": "Landing.jobs (EU tech board)",
+    "access": "official API (no auth for jobs; stale docs but live)",
+    "effort": "low",
+    "endpoint": "https://landing.jobs/api/v1/jobs",
+    "docsUrl": "https://github.com/LandingJobs/LandingJobs-api",
+    "detail": "LIVE-VERIFIED 2026-07-20: GET /api/v1/jobs returns HTTP 200 with a JSON array; per-job fields observed live: id, title, gross_salary_low, gross_salary_high, currency_code, remote (boolean), locations, relocation_paid, tags, type, role_description, main_requirements, nice_to_have, perks, url, published_at, expires_at. So it DOES expose structured salary plus a remote flag — rare combination. Params: offset, limit (max 50); no server-side country/remote filters — filter client-side. Caveats: the GitHub docs were last meaningfully updated ~2015 (examples dated Feb 2015) and the board is Portugal/Southern-Europe-heavy, so Germany-eligible remote roles are a subset; treat as a bonus feed and validate strictly. Other EU-remote boards worth adding via the sources above rather than separately: EU Remote Jobs / remoteok tag=europe filtering client-side; if you want one more, remotive's candidate_required_location='Europe' already covers most of them."
+   },
+   {
+    "name": "StepStone / Indeed / LinkedIn / Xing (the big German-market boards)",
+    "access": "email alerts (only legitimate personal-use path); no public search API; scraping hostile",
+    "effort": "high",
+    "endpoint": "none public (StepStone partner API: https://api.stepstone.com — ATS/posting partners only; Indeed partner docs: https://docs.indeed.com)",
+    "docsUrl": "https://docs.indeed.com/job-sync-api/ ; https://api.stepstone.com/status-codes/ ; https://jobspipe.dev/blog/indeed-api-guide",
+    "detail": "As of July 2026: STEPSTONE — no public job-search API; api.stepstone.com serves approved recruiting/ATS partners only; site sits behind aggressive bot protection; no public RSS; saved-search EMAIL ALERTS still work and can be parsed from your own inbox (IMAP) — that is the legitimate personal path. INDEED — the old Publisher/XML search API was discontinued (keys dead since the 2023/2024 shutdown); remaining APIs (Job Sync, Indeed Apply) are partner-gated for posting, not searching; Cloudflare anti-bot; RSS feeds were retired years ago; email alerts remain and much Indeed/StepStone inventory leaks back out through Adzuna and Jooble anyway. LINKEDIN — explicitly no public jobs-search API (partner posting workflows only); scraping is prohibited by ToS and litigated; strong anti-automation; email job alerts fine. XING/New Work — the public developer API (dev.xing.com) was shut down years ago and API access was further restricted to approved partners around 2022–2023; no jobs API, no RSS; email alerts exist. Recommendation: do NOT scrape these four — cover their inventory indirectly via Adzuna + Jooble + BA (many StepStone/Indeed postings are cross-posted or aggregated there) and optionally an IMAP parser for your own alert emails."
+   }
+  ],
+  "scrapingPackages": [
+   {
+    "name": "undici",
+    "purpose": "HTTP client of choice in the Electron MAIN process — it's Node core's fetch engine, fast, with Agent-level timeouts/connection pooling, and no CORS restrictions in main; set an explicit browser-like User-Agent (RemoteOK and WWR 403 default UAs)."
+   },
+   {
+    "name": "got",
+    "purpose": "Alternative to undici if you want batteries included — built-in retries with backoff, hooks, and pagination helpers suit polling flaky job APIs; pure Node so it works unmodified in Electron main (pick got OR undici, not both; skip ky — it's a browser-fetch wrapper aimed at renderer-side code)."
+   },
+   {
+    "name": "cheerio",
+    "purpose": "jQuery-style static HTML parsing for the HTML `description` fields (Arbeitnow, Remotive, Himalayas, WWR) and any server-rendered detail pages — no browser needed, tiny footprint."
+   },
+   {
+    "name": "rss-parser",
+    "purpose": "RSS/Atom → JSON for the WeWorkRemotely feeds; use its customFields option to capture WWR's non-standard <region> and <media:content> elements, and pass a custom User-Agent header via its requestOptions."
+   },
+   {
+    "name": "zod",
+    "purpose": "Validate every external API response at the boundary before it touches your DB/UI — essential here because BA renamed its entire response schema between v4 and v6 and Arbeitnow silently dropped fields; schemas double as TypeScript types for your IPC payloads to the renderer."
+   },
+   {
+    "name": "playwright-core (optional)",
+    "purpose": "Only if you later must render a JS-heavy page; Electron-specific warning: Playwright downloads separate browser binaries and cannot drive Electron's own bundled Chromium for scraping — keep it an optional/dev dependency and mark its binaries as asarUnpack in electron-builder, or your packaged app breaks. Not needed for any source recommended above."
+   },
+   {
+    "name": "crawlee — NOT recommended",
+    "purpose": "Skip it: its request-queue/proxy-rotation/autoscaling machinery is built for large-scale crawling and drags in heavy browser deps — overkill and a liability for a single-user app doing a few dozen requests per day."
+   }
+  ],
+  "payTransparency": "Germany MISSED the transposition deadline. Directive (EU) 2023/970 required national implementation by 7 June 2026; as of July 2026 Germany has not even published a draft bill (Referentenentwurf). The Expert Commission delivered its final report to Federal Minister Prien on 7 Nov 2025, but coalition infighting and 'economic burden' arguments pushed the timeline back: the Family Ministry now says a draft will come in early 2027, the act would enter into force in early 2027 at the earliest, and key employee rights/reporting duties would likely apply only from around June 2028. The European Commission has refused to extend the deadline and is threatening infringement proceedings (Art. 258/260 TFEU). Two partial effects exist NOW: (1) the directive applies directly to PUBLIC-SECTOR employers (state as employer) since 8 June 2026, and (2) German labour courts are increasingly interpreting the existing Entgelttransparenzgesetz (2017) in light of the directive. What eventually changes for job postings: employers must disclose the starting salary or pay range to applicants BEFORE the interview — ideally in the ad itself — and may no longer ask about salary history. REAL-WORLD EFFECT FOR THE APP AS OF JULY 2026: none yet for private employers — German postings on BA/StepStone/Indeed still overwhelmingly omit salary (empirically confirmed: BA API's verguetungsangabe field was 'KEINE_ANGABEN' on sampled Munich jobs). Do not design around posted salaries for Munich on-site jobs before 2027/2028; until then the practical salary signals are Adzuna's salary_min/salary_max (often model-predicted for DE, flagged by salary_is_predicted), and structured salary fields on remote boards (Himalayas minSalary/maxSalary, Landing.jobs gross_salary_low/high, Remotive/RemoteOK free-text). Sources: Oppenhoff (oppenhoff.eu, 'Germany has missed the EU deadline... Brussels has refused to extend'), Noerr (noerr.com, 'Failure to transpose... what applies after 7 June 2026'), Bird & Bird (twobirds.com, Expert Commission report), Ogletree (ogletree.com, Feb 2026 requirements overview).",
+  "notes": "All endpoint claims live-tested on 2026-07-20 unless marked otherwise; test artifacts (raw JSON captures) are in /private/tmp/claude-502/-Users-souhaib-farhat-Desktop-Souhaib-DEV/4f259717-8254-4454-9047-b3d0783bad9d/scratchpad/ (ba_v6.json, arbeitnow.json, remoteok.json, wwr.rss). Key empirical findings that differ from published docs: (1) BA Jobsuche is now v6 for search and the community-documented remote filter arbeitszeit=ho is broken there — use the undocumented homeoffice=nv_true query param (verified to match the facet count exactly: 318 of 1689 Munich software jobs within 25 km) or filter client-side on the per-job homeofficemoeglich boolean; homeoffice=true throws HTTP 500. (2) RemoteOK and WeWorkRemotely return 403 to non-browser User-Agents — set a Chrome-like UA. (3) Arbeitnow's live schema no longer contains visa_sponsorship or any salary field. (4) Landing.jobs' 2015-era API still works and includes structured salary + remote flag. Suggested architecture for the app: BA Jobsuche as the Munich/hybrid anchor (free, no signup, radius + homeoffice filters); Adzuna (de) as the only Munich source with salary numbers (2,500 calls/month free is plenty); Arbeitnow for German startup/English-speaking roles; Himalayas (country=DE) + Remotive (candidate_required_location) + WWR RSS + RemoteOK for remote-in-Germany/Europe; Jooble as aggregator gap-filler that indirectly surfaces StepStone/Indeed inventory. Do not scrape StepStone/Indeed/LinkedIn/Xing — partner-only APIs, hostile anti-bot, ToS risk; their legitimate personal-use path is saved-search email alerts (parse your own inbox via IMAP if wanted). Respect per-source politeness rules: Remotive max ~4 polls/day and >2 req/min gets blocked; Himalayas paginates at 20 with 429s on bursts; RemoteOK/Remotive/Himalayas/Adzuna all require link-back attribution if listings are displayed (fine inside a personal app, relevant if it ever becomes public). A 2-4x/day sync cadence across all sources stays comfortably within every limit."
+ },
+ "verification": {
+  "verdicts": [
+   {
+    "source": "Bundesagentur für Arbeit 'Jobsuche' API",
+    "status": "WORKS",
+    "evidence": "curl -H 'X-API-Key: jobboerse-jobsuche' 'https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/pc/v6/jobs?was=software&wo=M%C3%BCnchen&umkreis=25&size=2' → 200 with: {\"ergebnisliste\":[{\"stellenangebotsTitel\":\"Software Engineer (m/w/d)\",\"verguetungsangabe\":\"KEINE_ANGABEN\",\"stellenlokationen\":[{\"adresse\":{\"plz\":\"80809\",\"ort\":\"München\",\"region\":\"BAYERN\"}}],\"homeofficemoeglich\":false,\"firma\":\"Haas Zeitarbeit GmbH\",\"referenznummer\":\"11112-1484-1779489-1-S\",\"entfernung\":4,...}],\"maxErgebnisse\":1689,\"woOutput\":{\"bereinigterOrt\":\"München\",\"suchmodus\":\"UMKREISSUCHE\"}}. Remote filter test: adding &homeoffice=nv_true → maxErgebnisse: 318, first job homeofficemoeglich: true, and facetten.homeoffice = {\"counts\":{\"prozentual\":64,\"nv_false\":64,\"nv_true\":318},\"maxCount\":1689} — exactly matches the claim (318 of 1689). Also reproduced the claimed failure modes: &homeoffice=true → HTTP 500; &arbeitszeit=ho → maxErgebnisse: 0. Salary claim confirmed: verguetungsangabe was 'KEINE_ANGABEN' on sampled jobs; verguetung facet exists ({\"jahr\":42,\"stunde\":4} within the homeoffice subset). Every empirical detail in the claim reproduced exactly."
+   },
+   {
+    "source": "Arbeitnow",
+    "status": "WORKS",
+    "evidence": "curl 'https://www.arbeitnow.com/api/job-board-api' → 200 JSON. data[0] keys exactly as claimed: ['company_name','created_at','description','job_types','location','remote','slug','tags','title','url']. Sample locations German-focused: ['Frankfurt am Main','Werther','Berlin','Deutschlandweit','München',...]. Confirmed: NO salary field in any of 100 jobs; visa_sponsorship field gone (schema drift claim correct); Laravel-style links.next/meta pagination present; meta.terms = 'This is a free public API for jobs, please do not abuse...'. Extra finding: a ?location= query param appears in the API's own pagination links, but testing ?location=munich returned mixed cities (Berlin, Frankfurt, etc.) — it does not actually filter, so the claim 'no server-side location filter, filter client-side' stands."
+   },
+   {
+    "source": "Adzuna",
+    "status": "NEEDS_KEY",
+    "evidence": "curl 'https://api.adzuna.com/v1/api/jobs/de/search/1?app_id=test&app_key=test' → HTTP 401 with JSON body {\"display\":\"Authorisation failed\",\"exception\":\"AUTH_FAIL\",\"__CLASS__\":\"Adzuna::API::Response::Exception\",\"doc\":\"https://api.adzuna.com/v1/doc\"} — the /jobs/de/search/{page} route is live and behaves exactly as claimed (AUTH_FAIL without valid key). Docs page https://developer.adzuna.com/docs/search → HTTP 200. Salary fields, rate limits, and distance-unit details cannot be verified without registering a personal key, which is out of scope per instructions.",
+    "correctedDetail": "Note: without any credentials at all the endpoint returns an HTML error page; the documented JSON AUTH_FAIL only appears when app_id/app_key params are present but invalid. Cosmetic difference only."
+   },
+   {
+    "source": "Jooble",
+    "status": "NEEDS_KEY",
+    "evidence": "POST curl to https://jooble.org/api/invalidkey123 with JSON body {keywords, location} → Cloudflare 'Just a moment...' challenge page (curl is bot-blocked without a valid context; cannot probe auth behavior keyless). Docs verified: https://help.jooble.org/en/support/solutions/articles/60001448238-rest-api-documentation → HTTP 200 (with browser UA). https://jooble.org/api/about → 403 to curl even with a browser UA (Cloudflare), but the REST docs page confirms the API exists as described. Endpoint shape, params, and response fields cannot be verified without a granted key (form-based signup, as claimed)."
+   },
+   {
+    "source": "RemoteOK",
+    "status": "CORRECTED",
+    "evidence": "curl -A 'Mozilla/5.0 ... Chrome/126' 'https://remoteok.com/api' → 200, array of 101 elements. Element [0] = {legal: 'API Terms of Service: Please link back (with follow, and without nofollow!) to the URL on Remote OK and mention Remote O...', last_updated}. Job element keys: ['apply_url','company','company_logo','date','description','epoch','id','location','logo','position','salary_max','salary_min','slug','tags','url']. Sample job: 'Night Cleaning Crew | Billings Family YMCA | loc: Good Night,  | salary_min: 0 salary_max: 0' — the messy location value 'Good Night, ' from the claim reproduced verbatim, and salary 0=not-stated confirmed. Structure, fields, legal element, ~100-job cap: all confirmed.",
+    "correctedDetail": "The claim 'returns 403 to default HTTP-library user agents' did NOT reproduce: plain curl with its default UA also returned HTTP 200 today. The 403 behavior may be intermittent, IP-dependent, or specific to other clients (e.g. plain fetch); sending a browser UA remains harmless defensive practice, but it is not currently required for curl."
+   },
+   {
+    "source": "Remotive",
+    "status": "CORRECTED",
+    "evidence": "curl 'https://remotive.com/api/remote-jobs?category=software-dev&limit=3' → 200. Top-level keys: ['0-legal-notice','00-warning','job-count','jobs','total-job-count']. Job keys confirmed: ['candidate_required_location','category','company_logo','company_name','description','id','job_type','publication_date','salary','tags','title','url'] — the key candidate_required_location field and free-text salary (sample: '$36k') exist as claimed. HOWEVER: with category=software-dev&limit=3 the response had job-count: 42, total: 42, and the FIRST job was 'Medical | Patient Care Specialist | crl: USA' — i.e. neither `category` nor `limit` was honored in the live test, and total inventory exposed was only 42 jobs.",
+    "correctedDetail": "Endpoint and field names are correct, but the query params `category` and `limit` were not applied in live testing (non-software jobs returned, limit ignored), and the API currently exposes only ~42 jobs total — far less than historical volume. Filter client-side on the `category` and `candidate_required_location` fields; do not rely on server-side params. Rate-limit rules (max ~2 req/min) were respected during testing and remain unverified but plausible."
+   },
+   {
+    "source": "WeWorkRemotely (RSS)",
+    "status": "CORRECTED",
+    "evidence": "curl -A 'Mozilla/5.0 ... Chrome/126' 'https://weworkremotely.com/remote-jobs.rss' → 200 valid RSS with exactly 96 <item> elements (matches the claimed 96). Custom <region> element confirmed, sample values: 'Anywhere in the World' (dominant, matching the ~74% claim). Title format 'Company: Role' confirmed (sample: 'LawnStarter: Senior Product Manager, Pricing').",
+    "correctedDetail": "The claim 'default clients get 403 — verified' did NOT reproduce: plain curl with its default UA returned HTTP 200 on the feed today. As with RemoteOK, the 403 may be intermittent or client/IP-specific; keep a browser UA defensively but it was not required in this test."
+   },
+   {
+    "source": "Himalayas",
+    "status": "WORKS",
+    "evidence": "curl 'https://himalayas.app/jobs/api?limit=2' → 200, no auth: {\"offset\":0,\"limit\":2,\"totalCount\":99748,\"jobs\":[{\"title\":\"PK/PD Senior Scientist\",\"companyName\":\"Zoetis\",\"companySlug\":\"zoetis\",\"employmentType\":\"Full Time\",\"minSalary\":114000,\"maxSalary\":185000,\"salaryPeriod\":\"annual\",\"currency\":\"USD\",\"locationRestrictions\":[\"United States\"],\"timezoneRestrictions\":[-10,...],...}]} — structured salary confirmed. Germany filter test: curl 'https://himalayas.app/jobs/api/search?country=DE&q=software' → 200, totalCount: 250, first job 'Software Support Specialist (m/w/d) - fully remote möglich (Remote work, DE)' — the country=DE remote-in-Germany filter works as claimed. Docs page https://himalayas.app/api → 200. Minor field-name nits: live fields are `timezoneRestrictions` (claim said timezoneRestriction[]) and `categories` (claim said category); validate against live names."
+   },
+   {
+    "source": "The Muse",
+    "status": "WORKS",
+    "evidence": "curl -D - 'https://www.themuse.com/api/public/jobs?page=1&location=Munich%2C%20Germany' → HTTP/2 200 with headers x-ratelimit-limit: 500, x-ratelimit-remaining: 499, x-ratelimit-reset: 3600 — confirming the keyless 500/hour tier exactly. 20 results/page confirmed; job fields ['name','company','locations','levels','refs','contents','publication_date',...] and NO salary field, all as claimed. Caveat verified live: the location filter is loose — only 6 of 20 first-page results actually listed 'Munich, Germany' in locations (others were 'Flexible / Remote', 'New York, NY', 'El Segundo, CA'), and page_count was 336, so filter again client-side on the locations[] array; Munich yield is modest as claimed."
+   },
+   {
+    "source": "Landing.jobs",
+    "status": "WORKS",
+    "evidence": "curl 'https://landing.jobs/api/v1/jobs?limit=2' → HTTP 200, JSON array. Job keys observed live: ['created_at','currency_code','expires_at','gross_salary_high','gross_salary_low','id','locations','main_requirements','nice_to_have','perks','published_at','relocation_paid','remote','role_description','tags','title','type','updated_at','url']. Sample: 'Senior Java Software Developer | salary: 50000 - 67000 EUR | remote: False' — structured salary plus remote boolean confirmed exactly as claimed, no auth. Sampled location country code was 'PT', consistent with the Portugal-heavy caveat."
+   },
+   {
+    "source": "StepStone / Indeed / LinkedIn / Xing",
+    "status": "UNVERIFIABLE",
+    "evidence": "Partial verification only: curl -A 'Mozilla/5.0' 'https://api.stepstone.com/status-codes/' → 200 and curl 'https://docs.indeed.com/job-sync-api/' → 200, confirming both partner-only API doc sites exist as cited. The core claims — no public search API on any of the four, partner-gating, retired Indeed Publisher API, shut-down Xing dev API, email alerts as the remaining path — are negative/historical claims that cannot be proven by curl (absence of an API is not directly testable, and email-alert flows require personal accounts). Nothing observed contradicts the claims, and no public search endpoint was found at the cited hosts. Treat the 'do not scrape, use Adzuna/Jooble/BA + IMAP alerts instead' recommendation as sound but not curl-provable."
+   }
+  ]
+ }
+}

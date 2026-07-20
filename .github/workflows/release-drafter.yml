@@ -1,0 +1,25 @@
+name: Release Drafter
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  update-draft:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: release-drafter/release-drafter@v6
+        # PR runs are best-effort (the autolabeler); drafting happens on main.
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
+        env:
+          # Optional RELEASE_PAT makes the draft user-owned so publishing it
+          # triggers release.yml even from automation.
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}

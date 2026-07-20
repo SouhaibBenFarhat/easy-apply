@@ -1,0 +1,213 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.4/schema.json",
+  "files": {
+    "includes": [
+      "**",
+      "!node_modules",
+      "!out",
+      "!dist",
+      "!coverage",
+      "!.typecheck-temp",
+      "!modules/test-utils/fixtures",
+      "!planning",
+      "!pnpm-lock.yaml",
+      "!src/renderer/styles/globals.css"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "asNeeded"
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "correctness": {
+        "noUnusedImports": "error",
+        "noUnusedVariables": "error"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["modules/logger/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@ui-kit": "logger is L0: no imports from app modules.",
+                  "@data": "logger is L0: no imports from app modules.",
+                  "@sources/shared": "logger is L0: no imports from app modules.",
+                  "@feed": "logger is L0: no imports from app modules.",
+                  "@tracker": "logger is L0: no imports from app modules.",
+                  "@sources-page": "logger is L0: no imports from app modules.",
+                  "@settings": "logger is L0: no imports from app modules.",
+                  "@shell": "logger is L0: no imports from app modules.",
+                  "@app": "logger is L0: no imports from app modules."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["modules/ui-kit/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@data": "ui-kit is L1: it may import only @logger (and @test-utils in tests).",
+                  "@sources/shared": "ui-kit is L1: no data/source imports.",
+                  "@persistence/main": "ui-kit is renderer-side: never import main-process code.",
+                  "@feed": "ui-kit is L1: no feature imports.",
+                  "@tracker": "ui-kit is L1: no feature imports.",
+                  "@sources-page": "ui-kit is L1: no feature imports.",
+                  "@settings": "ui-kit is L1: no feature imports.",
+                  "@shell": "ui-kit is L1: no feature imports.",
+                  "@app": "ui-kit is L1: no app imports."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["modules/data/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@ui-kit": "data is L1: UI and data cannot import each other.",
+                  "@persistence/main": "data is renderer-side: talk to persistence via IPC, never import main-process code.",
+                  "@sources/main": "data is renderer-side: never import main-process code.",
+                  "@feed": "data is L1: no feature imports.",
+                  "@tracker": "data is L1: no feature imports.",
+                  "@sources-page": "data is L1: no feature imports.",
+                  "@settings": "data is L1: no feature imports.",
+                  "@shell": "data is L1: no feature imports.",
+                  "@app": "data is L1: no app imports."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["modules/sources/**", "modules/persistence/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@ui-kit": "main-process modules never import renderer UI.",
+                  "@data": "main-process modules never import renderer data.",
+                  "@feed": "main-process modules never import features.",
+                  "@tracker": "main-process modules never import features.",
+                  "@sources-page": "main-process modules never import features.",
+                  "@settings": "main-process modules never import features.",
+                  "@shell": "main-process modules never import features.",
+                  "@app": "main-process modules never import the app layer."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "modules/feed/**",
+        "modules/tracker/**",
+        "modules/sources-page/**",
+        "modules/settings/**",
+        "modules/shell/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@feed": "features are L3: they never import each other.",
+                  "@tracker": "features are L3: they never import each other.",
+                  "@sources-page": "features are L3: they never import each other.",
+                  "@settings": "features are L3: they never import each other.",
+                  "@shell": "features are L3: they never import each other.",
+                  "@app": "features are L3: they never import the app layer.",
+                  "@persistence/main": "features are renderer-side: never import main-process code.",
+                  "@sources/main": "features are renderer-side: never import main-process code."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["modules/app/**", "src/renderer/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@persistence/main": "renderer never imports main-process code.",
+                  "@sources/main": "renderer never imports main-process code.",
+                  "@logger/main": "renderer never imports main-process code."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/main/**", "src/preload/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@ui-kit": "main process never imports renderer modules.",
+                  "@data": "main process never imports renderer modules.",
+                  "@feed": "main process never imports renderer modules.",
+                  "@tracker": "main process never imports renderer modules.",
+                  "@sources-page": "main process never imports renderer modules.",
+                  "@settings": "main process never imports renderer modules.",
+                  "@shell": "main process never imports renderer modules.",
+                  "@app": "main process never imports renderer modules."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

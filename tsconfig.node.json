@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "outDir": ".typecheck-temp/node",
+    "baseUrl": ".",
+    "paths": {
+      "@logger": ["modules/logger/index.ts"],
+      "@logger/main": ["modules/logger/main.ts"],
+      "@sources/shared": ["modules/sources/shared/index.ts"],
+      "@sources/main": ["modules/sources/main/index.ts"],
+      "@persistence/main": ["modules/persistence/main/index.ts"]
+    }
+  },
+  "include": [
+    "src/main/**/*.ts",
+    "src/preload/**/*.ts",
+    "modules/logger/**/*.ts",
+    "modules/sources/shared/**/*.ts",
+    "modules/sources/main/**/*.ts",
+    "modules/persistence/main/**/*.ts",
+    "electron.vite.config.ts"
+  ]
+}
