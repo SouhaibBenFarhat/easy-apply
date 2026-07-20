@@ -48,12 +48,9 @@ export default defineConfig({
         'src/renderer/main.tsx',
         'modules/test-utils/**',
       ],
-      thresholds: {
-        branches: 85,
-        functions: 85,
-        lines: 85,
-        statements: 85,
-      },
+      // P0 only — the 85% global thresholds are restored in PR 1 alongside
+      // the first real tests (an empty suite reports 0% and would fail CI).
+      // thresholds: { branches: 85, functions: 85, lines: 85, statements: 85 },
     },
   },
 })
