@@ -1,13 +1,17 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow } from 'electron'
+import { registerSettingsIpc } from './ipc/settings'
+import { installMenu } from './menu'
+import { installContentSecurityPolicy, installWindowGuards } from './security'
+import { store } from './store'
 
-// Kept intentionally thin (PLAN.md §4.1): window/lifecycle here; sync engine,
-// persistence, and IPC surfaces arrive in PRs 3–9.
+// Kept intentionally thin (PLAN.md §4.1): window/lifecycle/menu/security here;
+// sync engine and persistence IPC arrive in PRs 4–9.
 
 function createWindow(): void {
+  const bounds = store.get('windowBounds')
   const window = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    ...bounds,
     minWidth: 1000,
     minHeight: 700,
     show: false,
@@ -24,12 +28,11 @@ function createWindow(): void {
   })
 
   window.on('ready-to-show', () => window.show())
-
-  // Deny-all window opens; external links go through the OS browser.
-  window.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('https://') || url.startsWith('http://')) void shell.openExternal(url)
-    return { action: 'deny' }
+  window.on('close', () => {
+    store.set('windowBounds', window.getBounds())
   })
+
+  installWindowGuards(window)
 
   if (process.env.ELECTRON_RENDERER_URL) {
     void window.loadURL(process.env.ELECTRON_RENDERER_URL)
@@ -39,6 +42,9 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  installContentSecurityPolicy()
+  installMenu()
+  registerSettingsIpc()
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
