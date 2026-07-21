@@ -1,3 +1,4 @@
+import { FeedPage } from '@feed'
 import { SettingsPage } from '@settings'
 import type { AnyRouter } from '@tanstack/react-router'
 import {
@@ -7,7 +8,7 @@ import {
   createRouter,
 } from '@tanstack/react-router'
 import { EmptyState } from '@ui-kit'
-import { ClipboardList, Plug, Rss } from 'lucide-react'
+import { ClipboardList, Plug } from 'lucide-react'
 import type { ReactElement } from 'react'
 import { RootLayout } from './RootLayout'
 
@@ -23,18 +24,7 @@ const rootRoute = createRootRoute({
   staticData: { title: 'EasyApply' },
 })
 
-// Placeholder pages — replaced by the real features in PRs 12–14.
-function FeedPage(): ReactElement {
-  return (
-    <EmptyState
-      className="h-full"
-      icon={<Rss className="size-5" />}
-      title="Coming soon"
-      description="Feed lands in PR 12."
-    />
-  )
-}
-
+// Placeholder pages — replaced by the real features in PRs 13–14.
 function TrackerPage(): ReactElement {
   return (
     <EmptyState

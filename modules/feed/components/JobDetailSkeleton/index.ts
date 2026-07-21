@@ -1,0 +1,1 @@
+export { JobDetailSkeleton } from './JobDetailSkeleton'

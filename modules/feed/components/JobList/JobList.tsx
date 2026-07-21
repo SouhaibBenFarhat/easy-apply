@@ -1,0 +1,174 @@
+import type { JobStatus, StoredJob } from '@sources/shared'
+import { useVirtualizer } from '@tanstack/react-virtual'
+import type { BadgeProps } from '@ui-kit'
+import { Badge, cn, formatRelativeTime } from '@ui-kit'
+import type { CSSProperties, ReactElement } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { formatSalary, remoteScopeLabel, workModeLabel } from '../../lib/format'
+
+export interface JobListProps {
+  jobs: StoredJob[]
+  selectedId: string | null
+  onSelect: (id: string) => void
+  /** ISO timestamp of the previous feed visit; jobs first seen after it are "new". */
+  newSince: string | null
+  /** sourceId → displayName, for the source chip. */
+  sourceNames: Record<string, string>
+}
+
+type Row = { kind: 'divider' } | { kind: 'job'; job: StoredJob; jobIndex: number }
+
+type BadgeVariant = NonNullable<BadgeProps['variant']>
+
+const STATUS_VARIANTS: Record<JobStatus, BadgeVariant> = {
+  applied: 'success',
+  interview: 'info',
+  interested: 'warning',
+  rejected: 'destructive',
+}
+
+const STATUS_LABELS: Record<JobStatus, string> = {
+  interested: 'Interested',
+  applied: 'Applied',
+  interview: 'Interview',
+  rejected: 'Rejected',
+}
+
+const DIVIDER_SIZE = 32
+const ROW_SIZE = 76
+
+// §5.5 — the staggered fade+rise entrance runs once per app launch, never on
+// refetch, filter change or scroll. Module scope survives remounts.
+let entrancePlayed = false
+
+// Insert the "new since last visit" divider before the first job that is NOT
+// new (firstSeenAt <= newSince). The feed is newest-first; the divider renders
+// only when both groups are non-empty.
+function buildRows(jobs: StoredJob[], newSince: string | null): Row[] {
+  const rows: Row[] = jobs.map((job, jobIndex) => ({ kind: 'job', job, jobIndex }))
+  if (newSince === null) return rows
+  const split = jobs.findIndex((job) => job.firstSeenAt <= newSince)
+  if (split <= 0) return rows
+  rows.splice(split, 0, { kind: 'divider' })
+  return rows
+}
+
+export function JobList({
+  jobs,
+  selectedId,
+  onSelect,
+  newSince,
+  sourceNames,
+}: JobListProps): ReactElement {
+  const parentRef = useRef<HTMLDivElement | null>(null)
+  const rows = useMemo(() => buildRows(jobs, newSince), [jobs, newSince])
+
+  // Read-and-latch on first mount: only the mount that flips the flag plays
+  // the entrance, and only for the rows visible at that moment.
+  const [animateEntrance] = useState(() => {
+    if (entrancePlayed) return false
+    entrancePlayed = true
+    return true
+  })
+
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: (index) => (rows[index]?.kind === 'divider' ? DIVIDER_SIZE : ROW_SIZE),
+    getItemKey: (index) => {
+      const row = rows[index]
+      return row === undefined || row.kind === 'divider' ? 'new-divider' : row.job.id
+    },
+    overscan: 8,
+    // Rows are fixed-height (no measureElement), so the only rect consumer is
+    // the visible-range math; a static initial rect also lets happy-dom tests
+    // render rows despite the zero-size layout.
+    initialRect: { width: 420, height: 600 },
+  })
+
+  return (
+    <div ref={parentRef} className="min-h-0 flex-1 overflow-auto">
+      <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
+        {virtualizer.getVirtualItems().map((item) => {
+          const row = rows[item.index]
+          if (row === undefined) return null
+          const style: CSSProperties = {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: item.size,
+            transform: `translateY(${item.start}px)`,
+          }
+          if (row.kind === 'divider') {
+            return (
+              <div
+                key={item.key}
+                style={style}
+                className="flex items-end border-t border-primary/40 px-3 pb-1 animate-fade-in"
+              >
+                <span className="label-caps text-primary">New since your last visit</span>
+              </div>
+            )
+          }
+          const { job, jobIndex } = row
+          const salary = formatSalary(job.salary)
+          const selected = job.id === selectedId
+          const stagger = animateEntrance && jobIndex < 10
+          return (
+            <div key={item.key} style={style}>
+              <button
+                type="button"
+                data-selected={selected}
+                onClick={() => onSelect(job.id)}
+                className={cn(
+                  // §5.4 — flat row: hairline divider, background-change hover
+                  // only, no transforms inside the scrolling list.
+                  'relative flex h-full w-full flex-col justify-center gap-1 overflow-hidden',
+                  'border-b border-border-subtle px-3 py-2 text-left transition-colors',
+                  'hover:bg-interactive-hover',
+                  selected && 'bg-primary/10',
+                  stagger && 'animate-rise-in',
+                )}
+                style={stagger ? { animationDelay: `${jobIndex * 30}ms` } : undefined}
+              >
+                {selected ? (
+                  <span aria-hidden className="absolute inset-y-0 left-0 w-0.5 bg-primary" />
+                ) : null}
+                <span className="flex w-full items-center gap-2">
+                  <span
+                    className={cn(
+                      'min-w-0 truncate text-sm font-medium',
+                      selected && 'text-primary',
+                    )}
+                  >
+                    {job.title}
+                  </span>
+                  {salary !== null ? (
+                    <Badge variant="copper" className="ml-auto shrink-0">
+                      {salary}
+                    </Badge>
+                  ) : null}
+                </span>
+                <span className="label-caps w-full truncate">
+                  {job.company} · {job.city ?? job.locationRaw} ·{' '}
+                  {formatRelativeTime(job.postedAt ?? job.firstSeenAt)}
+                </span>
+                <span className="flex w-full items-center gap-1 overflow-hidden">
+                  <Badge variant="outline">{workModeLabel(job.workMode)}</Badge>
+                  {job.remoteScope !== null ? (
+                    <Badge variant="outline">{remoteScopeLabel(job.remoteScope)}</Badge>
+                  ) : null}
+                  <Badge>{sourceNames[job.sourceId] ?? job.sourceId}</Badge>
+                  {job.status !== null ? (
+                    <Badge variant={STATUS_VARIANTS[job.status]}>{STATUS_LABELS[job.status]}</Badge>
+                  ) : null}
+                </span>
+              </button>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
