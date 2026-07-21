@@ -39,6 +39,62 @@ export interface SourceInfo {
   attribution: { label: string; required: boolean }
 }
 
+// Mirrors modules/sources/main/engine.ts — the sync engine's push events and
+// pass summary, duplicated here because renderer-side compilation units never
+// include main-process code.
+export type SyncEvent =
+  | { type: 'sync:started'; startedAt: string }
+  | { type: 'source:started'; sourceId: SourceId }
+  | {
+      type: 'source:finished'
+      sourceId: SourceId
+      ok: boolean
+      inserted: number
+      updated: number
+      error: string | null
+    }
+  | {
+      type: 'sync:completed'
+      inserted: number
+      updated: number
+      failed: SourceId[]
+      finishedAt: string
+    }
+
+export interface SyncSummary {
+  inserted: number
+  updated: number
+  perSource: Array<{
+    sourceId: SourceId
+    ok: boolean
+    inserted: number
+    updated: number
+    error: string | null
+    skipped: boolean
+  }>
+  startedAt: string
+  finishedAt: string
+}
+
+// Mirrors modules/persistence/main/repositories/sync-runs.ts.
+export interface SyncRun {
+  id: number
+  sourceId: SourceId
+  startedAt: string
+  finishedAt: string | null
+  ok: boolean | null
+  error: string | null
+  inserted: number
+  updated: number
+}
+
+// Mirrors src/main/sync.ts — the exact 'sync:status' payload.
+export interface SyncStatus {
+  running: boolean
+  lastCompletedAt: string | null
+  recentRuns: SyncRun[]
+}
+
 export interface ElectronAPI {
   readonly platform: NodeJS.Platform
   readonly settings: {
@@ -72,6 +128,11 @@ export interface ElectronAPI {
       values: Record<string, string>,
     ) => Promise<IpcResult<SourceInfo>>
     readonly clearKey: (sourceId: SourceId) => Promise<IpcResult<SourceInfo>>
+  }
+  readonly sync: {
+    readonly now: () => Promise<IpcResult<SyncSummary>>
+    readonly status: () => Promise<IpcResult<SyncStatus>>
+    readonly onEvent: (callback: (event: SyncEvent) => void) => () => void
   }
 }
 

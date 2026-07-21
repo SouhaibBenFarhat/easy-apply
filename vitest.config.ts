@@ -8,8 +8,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve('src/renderer'),
-      '@logger': resolve('modules/logger/index.ts'),
+      // '@logger/main' must precede '@logger': object-form aliases match in
+      // insertion order, and the '@logger' prefix would otherwise swallow it.
       '@logger/main': resolve('modules/logger/main.ts'),
+      '@logger': resolve('modules/logger/index.ts'),
       '@ui-kit': resolve('modules/ui-kit/index.ts'),
       '@data': resolve('modules/data/index.ts'),
       '@sources/shared': resolve('modules/sources/shared/index.ts'),

@@ -5,13 +5,16 @@ import type {
   ElectronAPI,
   ProviderState,
   SourceInfo,
+  SyncEvent,
 } from '../../../src/preload/electron-api'
 
 // Full window.electron mock surface. Grown alongside the real preload bridge
 // so component tests never touch real IPC. The db namespace is a working
 // in-memory fake (plain arrays, no PGlite) that mirrors the repository
 // semantics: feed ordering, filters, preserved lifecycle fields; the sources
-// namespace mirrors the sources:* IPC semantics (setKey enables the source).
+// namespace mirrors the sources:* IPC semantics (setKey enables the source);
+// the sync namespace resolves quiet defaults, with push events driven from
+// tests via createSyncEventEmitter (below).
 
 export interface MockElectronSeed {
   jobs?: StoredJob[]
@@ -128,6 +131,23 @@ function applyFeedFilters(rows: StoredJob[], filters: FeedFilters): StoredJob[] 
   return out.slice(offset, offset + (filters.limit ?? 200))
 }
 
+// sync.onEvent subscribers, keyed by the mock's sync namespace object (not
+// the whole API) so the pairing survives setupMockElectron's spread
+// ({ ...createMockElectron(), ...overrides }).
+const syncListenersByNamespace = new WeakMap<ElectronAPI['sync'], Set<(event: SyncEvent) => void>>()
+
+// Pairs with createMockElectron/setupMockElectron: returns an emit function
+// that delivers a SyncEvent to everything the mock's sync.onEvent registered —
+// the test-side stand-in for webContents.send('sync:event', …). Kept as a
+// separate helper so the mock surface stays identical to ElectronAPI.
+export function createSyncEventEmitter(mock: ElectronAPI): (event: SyncEvent) => void {
+  return (event: SyncEvent): void => {
+    const listeners = syncListenersByNamespace.get(mock.sync)
+    if (listeners === undefined) return
+    for (const listener of [...listeners]) listener(event)
+  }
+}
+
 export function createMockElectron(seed: MockElectronSeed = {}): ElectronAPI {
   const settings: AppSettings = {
     searchProfile: DEFAULT_SEARCH_PROFILE,
@@ -140,6 +160,28 @@ export function createMockElectron(seed: MockElectronSeed = {}): ElectronAPI {
   )
 
   const findJob = (id: string): StoredJob | undefined => jobs.find((job) => job.id === id)
+
+  const syncListeners = new Set<(event: SyncEvent) => void>()
+  const sync: ElectronAPI['sync'] = {
+    now: async () => {
+      const nowIso = new Date().toISOString()
+      return {
+        success: true,
+        data: { inserted: 0, updated: 0, perSource: [], startedAt: nowIso, finishedAt: nowIso },
+      }
+    },
+    status: async () => ({
+      success: true,
+      data: { running: false, lastCompletedAt: null, recentRuns: [] },
+    }),
+    onEvent: (callback) => {
+      syncListeners.add(callback)
+      return () => {
+        syncListeners.delete(callback)
+      }
+    },
+  }
+  syncListenersByNamespace.set(sync, syncListeners)
 
   return {
     platform: 'darwin',
@@ -212,6 +254,7 @@ export function createMockElectron(seed: MockElectronSeed = {}): ElectronAPI {
         return { success: true, data: { ...info } }
       },
     },
+    sync,
   }
 }
 

@@ -7,9 +7,10 @@ import { registerSourcesIpc } from './ipc/sources'
 import { installMenu } from './menu'
 import { installContentSecurityPolicy, installWindowGuards } from './security'
 import { store } from './store'
+import { installSync } from './sync'
 
-// Kept intentionally thin (PLAN.md §4.1): window/lifecycle/menu/security and
-// persistence wiring here; the sync engine arrives in PR 9.
+// Kept intentionally thin (PLAN.md §4.1): window/lifecycle/menu/security,
+// persistence wiring, and the sync scheduler installation.
 
 let db: AppDatabase | undefined
 
@@ -60,6 +61,7 @@ app.whenReady().then(async () => {
   })
   registerDbIpc(db)
   registerSourcesIpc(db)
+  installSync(db)
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
