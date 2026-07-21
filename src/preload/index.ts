@@ -24,6 +24,14 @@ const api = {
         ipcRenderer.invoke('db:providers:set-enabled', sourceId, enabled),
     },
   },
+  sources: {
+    list: () => ipcRenderer.invoke('sources:list'),
+    setEnabled: (sourceId: string, enabled: boolean) =>
+      ipcRenderer.invoke('sources:set-enabled', { sourceId, enabled }),
+    setKey: (sourceId: string, values: Record<string, string>) =>
+      ipcRenderer.invoke('sources:set-key', { sourceId, values }),
+    clearKey: (sourceId: string) => ipcRenderer.invoke('sources:clear-key', { sourceId }),
+  },
 }
 
 contextBridge.exposeInMainWorld('electron', api)

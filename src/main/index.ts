@@ -3,6 +3,7 @@ import { type AppDatabase, createDatabase } from '@persistence/main'
 import { app, BrowserWindow } from 'electron'
 import { registerDbIpc } from './ipc/db'
 import { registerSettingsIpc } from './ipc/settings'
+import { registerSourcesIpc } from './ipc/sources'
 import { installMenu } from './menu'
 import { installContentSecurityPolicy, installWindowGuards } from './security'
 import { store } from './store'
@@ -58,6 +59,7 @@ app.whenReady().then(async () => {
       : join(app.getAppPath(), 'drizzle'),
   })
   registerDbIpc(db)
+  registerSourcesIpc(db)
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

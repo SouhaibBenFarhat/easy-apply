@@ -1,16 +1,94 @@
 import type { FeedFilters, StoredJob } from '@sources/shared'
 import { DEFAULT_SEARCH_PROFILE } from '@sources/shared'
-import type { AppSettings, ElectronAPI, ProviderState } from '../../../src/preload/electron-api'
+import type {
+  AppSettings,
+  ElectronAPI,
+  ProviderState,
+  SourceInfo,
+} from '../../../src/preload/electron-api'
 
 // Full window.electron mock surface. Grown alongside the real preload bridge
 // so component tests never touch real IPC. The db namespace is a working
 // in-memory fake (plain arrays, no PGlite) that mirrors the repository
-// semantics: feed ordering, filters, preserved lifecycle fields.
+// semantics: feed ordering, filters, preserved lifecycle fields; the sources
+// namespace mirrors the sources:* IPC semantics (setKey enables the source).
 
 export interface MockElectronSeed {
   jobs?: StoredJob[]
   providers?: ProviderState[]
+  sources?: SourceInfo[]
 }
+
+// Sensible defaults mirroring the real registry (same order): the five
+// keyless sources enabled, Adzuna — the keyed source — disabled with no key.
+const DEFAULT_SOURCES: readonly SourceInfo[] = [
+  {
+    sourceId: 'ba',
+    displayName: 'Arbeitsagentur',
+    homepage: 'https://www.arbeitsagentur.de/jobsuche/',
+    enabledByDefault: true,
+    enabled: true,
+    lastSyncAt: null,
+    hasKey: false,
+    attribution: { label: 'Bundesagentur für Arbeit', required: false },
+  },
+  {
+    sourceId: 'arbeitnow',
+    displayName: 'Arbeitnow',
+    homepage: 'https://www.arbeitnow.com',
+    enabledByDefault: true,
+    enabled: true,
+    lastSyncAt: null,
+    hasKey: false,
+    attribution: { label: 'arbeitnow.com', required: false },
+  },
+  {
+    sourceId: 'himalayas',
+    displayName: 'Himalayas',
+    homepage: 'https://himalayas.app',
+    enabledByDefault: true,
+    enabled: true,
+    lastSyncAt: null,
+    hasKey: false,
+    attribution: { label: 'Himalayas', required: true },
+  },
+  {
+    sourceId: 'remoteok',
+    displayName: 'RemoteOK',
+    homepage: 'https://remoteok.com',
+    enabledByDefault: true,
+    enabled: true,
+    lastSyncAt: null,
+    hasKey: false,
+    attribution: { label: 'Remote OK', required: true },
+  },
+  {
+    sourceId: 'wwr',
+    displayName: 'WeWorkRemotely',
+    homepage: 'https://weworkremotely.com',
+    enabledByDefault: true,
+    enabled: true,
+    lastSyncAt: null,
+    hasKey: false,
+    attribution: { label: 'We Work Remotely', required: false },
+  },
+  {
+    sourceId: 'adzuna',
+    displayName: 'Adzuna',
+    homepage: 'https://www.adzuna.de',
+    enabledByDefault: false,
+    enabled: false,
+    lastSyncAt: null,
+    hasKey: false,
+    requiresKey: {
+      fields: [
+        { id: 'app_id', label: 'Application ID', hint: 'from developer.adzuna.com' },
+        { id: 'app_key', label: 'Application key', hint: 'from developer.adzuna.com' },
+      ],
+    },
+    attribution: { label: 'Jobs by Adzuna', required: true },
+  },
+]
 
 function feedOrder(a: StoredJob, b: StoredJob): number {
   // posted_at desc nulls last, then first_seen_at desc — same as listFeed.
@@ -57,6 +135,9 @@ export function createMockElectron(seed: MockElectronSeed = {}): ElectronAPI {
   }
   const jobs: StoredJob[] = (seed.jobs ?? []).map((job) => ({ ...job }))
   const providers: ProviderState[] = (seed.providers ?? []).map((state) => ({ ...state }))
+  const sources = new Map<string, SourceInfo>(
+    (seed.sources ?? DEFAULT_SOURCES).map((info) => [info.sourceId, { ...info }]),
+  )
 
   const findJob = (id: string): StoredJob | undefined => jobs.find((job) => job.id === id)
 
@@ -102,6 +183,33 @@ export function createMockElectron(seed: MockElectronSeed = {}): ElectronAPI {
           }
           return { success: true, data: { ...state } }
         },
+      },
+    },
+    sources: {
+      list: async () => ({
+        success: true,
+        data: [...sources.values()].map((info) => ({ ...info })),
+      }),
+      setEnabled: async (sourceId, enabled) => {
+        const info = sources.get(sourceId)
+        if (info === undefined) return { success: false, error: `unknown source ${sourceId}` }
+        info.enabled = enabled
+        return { success: true, data: { ...info } }
+      },
+      setKey: async (sourceId, _values) => {
+        const info = sources.get(sourceId)
+        if (info === undefined) return { success: false, error: `unknown source ${sourceId}` }
+        if (info.requiresKey === undefined)
+          return { success: false, error: `${sourceId} does not take an API key` }
+        info.hasKey = true
+        info.enabled = true // setting a key implies intent to use — mirrors main
+        return { success: true, data: { ...info } }
+      },
+      clearKey: async (sourceId) => {
+        const info = sources.get(sourceId)
+        if (info === undefined) return { success: false, error: `unknown source ${sourceId}` }
+        info.hasKey = false
+        return { success: true, data: { ...info } }
       },
     },
   }

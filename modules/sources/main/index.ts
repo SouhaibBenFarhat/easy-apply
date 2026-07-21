@@ -9,5 +9,6 @@ export {
   type PoliteHttpClientOptions,
 } from './http'
 export { buildDedupeKey, cleanText, stripHtml, toIsoOrNull } from './normalize'
+export { decodeProviderConfig, encodeProviderConfig } from './provider-config-codec'
 export { getProvider, listProviderMeta, PROVIDERS } from './registry'
 export type { FetchContext, JobSourceProvider, ProviderMeta, RawPayload } from './types'
