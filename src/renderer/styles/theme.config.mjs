@@ -62,7 +62,8 @@ export const darkTokens = {
   surface: { role: 'neutral', l: 0.185, c: 0.032 },
   'surface-raised': { role: 'neutral', l: 0.202, c: 0.034 },
   'surface-hover': { role: 'neutral', l: 0.222, c: 0.035 },
-  header: { role: 'neutral', l: 0.31, c: 0.036 },
+  // One step above surface-raised — a quiet chrome strip, not a glowing slab.
+  header: { role: 'neutral', l: 0.25, c: 0.036 },
   overlay: { role: 'neutral', l: 0.275, c: 0.033 },
   foreground: { role: 'neutral', l: 0.96, c: 0.005 },
   'foreground-muted': { role: 'neutral', l: 0.625, c: 0.015 },
@@ -75,7 +76,9 @@ export const darkTokens = {
   'interactive-active': { role: 'neutral', l: 0.27, c: 0.022 },
   primary: { role: 'primary', l: 0.68, c: 0.13 },
   'primary-foreground': { role: 'neutral', l: 0.13, c: 0.01 },
-  input: { role: 'neutral', l: 0.185, c: 0.032 },
+  // Recessed well — text fields sit BELOW every container they appear in
+  // (bar 0.185, cards 0.202), the dark-mode mirror of light-mode gray fields.
+  input: { role: 'neutral', l: 0.128, c: 0.028 },
   ring: { role: 'primary', l: 0.68, c: 0.13 },
   success: { role: 'success', l: 0.7, c: 0.13 },
   'success-foreground': { role: 'neutral', l: 0.13, c: 0.005 },

@@ -36,7 +36,9 @@ const WORK_MODE_LABELS: Record<WorkMode, string> = {
   onsite: 'On-site',
   hybrid: 'Hybrid',
   remote: 'Remote',
-  unknown: '?',
+  // Unknown renders as nothing — an empty fixed-width slot keeps row columns
+  // aligned without shouting "?" at the reader (§5.4 scannability).
+  unknown: '',
 }
 
 export function workModeLabel(mode: WorkMode): string {

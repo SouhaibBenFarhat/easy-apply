@@ -33,8 +33,8 @@ describe('FeedPage', () => {
 
     expect(await screen.findByRole('button', { name: /Rust Engineer/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Frontend Engineer/ })).toBeInTheDocument()
-    // Source chips resolve display names through useSources.
-    expect(screen.getAllByText('Arbeitnow').length).toBeGreaterThanOrEqual(1)
+    // Source names resolve through useSources into the row meta line.
+    expect(screen.getAllByText(/Arbeitnow/).length).toBeGreaterThanOrEqual(1)
   })
 
   it('shows the no-jobs empty state when the db is empty', async () => {

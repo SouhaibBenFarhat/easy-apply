@@ -1,7 +1,6 @@
 import type { JobStatus, StoredJob } from '@sources/shared'
 import { JOB_STATUSES } from '@sources/shared'
 import {
-  Badge,
   Button,
   cn,
   formatRelativeTime,
@@ -40,9 +39,10 @@ export function TrackerRow({ job, sourceName, onSetStatus }: TrackerRowProps): R
         <span className="flex items-center gap-2">
           <span className="min-w-0 truncate text-sm font-medium">{job.title}</span>
           {salary !== null ? (
-            <Badge variant="copper" className="shrink-0">
+            // Plain copper text — the figure is the signal, no chip.
+            <span className="shrink-0 text-xs font-semibold tabular-nums text-primary">
               {salary}
-            </Badge>
+            </span>
           ) : null}
         </span>
         <span className="label-caps truncate">

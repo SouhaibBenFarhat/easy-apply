@@ -21,6 +21,7 @@ export interface QueryKeys {
     readonly theme: readonly ['settings', 'theme']
   }
   readonly local: {
+    readonly feedFilters: readonly ['local', 'feedFilters']
     readonly lastFeedVisit: readonly ['local', 'lastFeedVisit']
   }
 }
@@ -42,6 +43,7 @@ export const keys: QueryKeys = {
     theme: ['settings', 'theme'],
   },
   local: {
+    feedFilters: ['local', 'feedFilters'],
     lastFeedVisit: ['local', 'lastFeedVisit'],
   },
 }

@@ -6,7 +6,9 @@ import {
   useSetJobHidden,
   useSetJobNotes,
   useSetJobStatus,
+  useSetStoredFeedFilters,
   useSources,
+  useStoredFeedFilters,
 } from '@data'
 import type { FeedFilters } from '@sources/shared'
 import { Button, EmptyState, useDeferredLoading } from '@ui-kit'
@@ -32,8 +34,22 @@ function hasActiveFilters(filters: FeedFilters): boolean {
 // detail pane. Selection is plain local state; the PLAN's ?job= search-param
 // idea is deliberately dropped (deviation) to keep the router untouched.
 export function FeedPage(): ReactElement {
-  const [filters, setFilters] = useState<FeedFilters>({})
+  // The tab/toggle/source configuration is remembered across restarts (the
+  // `local` persistence namespace); the search text is ephemeral by design.
+  const storedFilters = useStoredFeedFilters()
+  const setStoredFilters = useSetStoredFeedFilters()
+  const [search, setSearch] = useState<string>('')
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
+
+  const filters = useMemo<FeedFilters>(
+    () => ({ ...storedFilters.data, ...(search === '' ? {} : { search }) }),
+    [storedFilters.data, search],
+  )
+  const setFilters = (next: FeedFilters): void => {
+    const { search: nextSearch, ...persistable } = next
+    setSearch(nextSearch ?? '')
+    setStoredFilters.mutate(persistable)
+  }
 
   const feed = useFeed(filters)
   const sources = useSources()
