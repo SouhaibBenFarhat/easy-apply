@@ -48,6 +48,11 @@ function createWindow(): void {
 }
 
 app.whenReady().then(async () => {
+  // Dev runs the stock Electron binary, whose Dock icon is Electron's — the
+  // real icon is only baked into the bundle at packaging time.
+  if (!app.isPackaged && process.platform === 'darwin') {
+    app.dock?.setIcon(join(app.getAppPath(), 'build/icon-1024.png'))
+  }
   installContentSecurityPolicy()
   installMenu()
   registerSettingsIpc()
