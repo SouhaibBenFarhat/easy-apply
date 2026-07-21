@@ -87,14 +87,25 @@ export interface MailboxAccountInfo {
 // Mirrors src/main/model.ts — the local-LLM model state.
 export type ModelState = 'absent' | 'downloading' | 'ready' | 'error'
 
+// One selectable model in the picker.
+export interface ModelChoice {
+  id: string
+  displayName: string
+  sizeBytes: number
+  reasoning: boolean
+  installed: boolean
+}
+
 export interface ModelStatus {
   state: ModelState
-  modelId: string
+  modelId: string // the selected model
   displayName: string
   totalBytes: number
   downloadedBytes: number
   error: string | null
   enabled: boolean
+  reasoning: boolean // the selected model is a reasoning model
+  catalog: ModelChoice[] // every downloadable model + its installed state
 }
 
 // Mirrors src/main/ipc/model.ts — the 'model:progress' push event.
@@ -104,14 +115,32 @@ export interface ModelProgressEvent {
   done: boolean
 }
 
+// Running counts for the email→job funnel, carried on 'pipeline' trace events
+// so the monitor can render live progress. Mirrors modules/sources/main/types.ts.
+export interface AgentPipelineStats {
+  emailsTotal: number // emails handed to the agent this run
+  emailsProcessed: number // emails the agent has finished (progress)
+  emailsAccepted: number // emails that yielded ≥1 kept job
+  emailsRejected: number // emails that yielded no job
+  jobsProposed: number // raw items the LLM returned, before the keep-harness
+  jobsKept: number // items that survived the harness → reached the feed
+  capped: boolean // true when the inbox exceeded the per-run scan cap
+  done: boolean // the run has finished or been stopped (drives the Stop button)
+  paused: boolean // the run is held mid-scan, waiting to resume
+  // The email currently in flight (null between emails / when done). `url` is a
+  // Gmail deep link to the message, or null when it can't be built.
+  current: { subject: string; sender: string; url: string | null } | null
+}
+
 // Mirrors src/main/sync.ts — one line in the agent's live activity trace.
 export interface AgentTraceEvent {
   seq: number
   at: string
-  channel: 'sync' | 'mailbox' | 'llm'
+  channel: 'sync' | 'mailbox' | 'llm' | 'pipeline' | 'thinking'
   label: string
   body?: string
   chars?: number
+  stats?: AgentPipelineStats
 }
 
 // Mirrors modules/persistence/main/repositories/sync-runs.ts.
@@ -178,6 +207,7 @@ export interface ElectronAPI {
     readonly cancel: () => Promise<IpcResult<ModelStatus>>
     readonly remove: () => Promise<IpcResult<ModelStatus>>
     readonly setEnabled: (enabled: boolean) => Promise<IpcResult<ModelStatus>>
+    readonly select: (modelId: string) => Promise<IpcResult<ModelStatus>>
     readonly onProgress: (callback: (event: ModelProgressEvent) => void) => () => void
   }
   readonly sync: {
@@ -187,6 +217,11 @@ export interface ElectronAPI {
   }
   readonly agent: {
     readonly onTrace: (callback: (event: AgentTraceEvent) => void) => () => void
+    // Interrupt the running pass; resolves true if a run was actually aborted.
+    readonly stop: () => Promise<IpcResult<boolean>>
+    // Hold / resume the running scan between emails.
+    readonly pause: () => Promise<IpcResult<boolean>>
+    readonly resume: () => Promise<IpcResult<boolean>>
   }
 }
 

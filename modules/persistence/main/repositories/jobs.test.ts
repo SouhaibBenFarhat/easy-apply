@@ -208,6 +208,23 @@ describe('listFeed', () => {
     expect(feed.map((job) => job.id)).toEqual(['ba:onsite', 'ba:hybrid'])
   })
 
+  it('filters by origin (agent inbox vs api)', async () => {
+    await upsertJobs(
+      db,
+      [makeJob({ id: 'linkedin:x', sourceId: 'linkedin', title: 'Agent role', dedupeKey: 'k9' })],
+      T0,
+    )
+    const agent = await listFeed(db, { origin: 'agent' })
+    expect(agent.map((job) => job.id)).toEqual(['linkedin:x'])
+    const api = await listFeed(db, { origin: 'api' })
+    expect(api.map((job) => job.id)).toEqual([
+      'ba:onsite',
+      'ba:hybrid',
+      'himalayas:eu',
+      'remoteok:ww',
+    ])
+  })
+
   it('filters by hasSalary (min OR max present)', async () => {
     const feed = await listFeed(db, { hasSalary: true })
     expect(feed.map((job) => job.id)).toEqual(['himalayas:eu'])

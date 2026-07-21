@@ -131,12 +131,12 @@ describe('JobDetailPane', () => {
   it('always shows the attribution link back to the posting', () => {
     const job = makeJob({ url: 'https://www.arbeitnow.com/jobs/abc', descriptionHtml: null })
     renderPane({ job, sourceName: 'Arbeitnow' })
-    const attribution = screen.getByRole('link', { name: 'via Arbeitnow ↗' })
+    const attribution = screen.getByRole('link', { name: 'via Arbeitnow' })
     expect(attribution).toHaveAttribute('href', 'https://www.arbeitnow.com/jobs/abc')
   })
 
   it('falls back to the source id when the display name is unknown', () => {
     renderPane({ job: makeJob({ sourceId: 'wwr' }), sourceName: null })
-    expect(screen.getByRole('link', { name: 'via wwr ↗' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'via wwr' })).toBeInTheDocument()
   })
 })

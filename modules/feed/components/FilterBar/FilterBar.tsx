@@ -1,5 +1,5 @@
 import type { SourceInfo } from '@data'
-import type { FeedFilters, SourceId, WorkMode } from '@sources/shared'
+import type { FeedFilters, JobOrigin, SourceId, WorkMode } from '@sources/shared'
 import {
   Button,
   Label,
@@ -38,6 +38,13 @@ function workModeTab(workModes: WorkMode[] | undefined): WorkModeTab {
   return mode === undefined || mode === 'unknown' ? 'all' : mode
 }
 
+// Segmented origin filter: All / Inbox (agent) / APIs.
+const ORIGIN_OPTIONS: Array<{ value: 'all' | JobOrigin; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'agent', label: 'Inbox' },
+  { value: 'api', label: 'APIs' },
+]
+
 export function FilterBar({ filters, sources, onChange }: FilterBarProps): ReactElement {
   const activeSources = filters.sources ?? sources.map((info) => info.sourceId)
   const toggleSource = (sourceId: SourceId): void => {
@@ -47,7 +54,9 @@ export function FilterBar({ filters, sources, onChange }: FilterBarProps): React
     // Selecting every source is the same as not filtering at all.
     onChange({ ...filters, sources: next.length === sources.length ? undefined : next })
   }
-  const filtersActive = filters.hasSalary === true || filters.sources !== undefined
+  const activeOrigin: 'all' | JobOrigin = filters.origin ?? 'all'
+  const filtersActive =
+    filters.hasSalary === true || filters.sources !== undefined || filters.origin !== undefined
 
   return (
     // The job-list sidebar's header (§sidebars): work-mode tabs + a gear that
@@ -81,6 +90,32 @@ export function FilterBar({ filters, sources, onChange }: FilterBarProps): React
           </Button>
         </PopoverTrigger>
         <PopoverContent align="end" className="w-64 space-y-2 p-2">
+          <div className="space-y-1.5 px-1 py-1">
+            <Label className="text-sm">Found via</Label>
+            <div className="flex gap-1">
+              {ORIGIN_OPTIONS.map((option) => {
+                const active = activeOrigin === option.value
+                return (
+                  <Button
+                    key={option.value}
+                    variant={active ? 'secondary' : 'ghost'}
+                    size="sm"
+                    aria-pressed={active}
+                    className="flex-1"
+                    onClick={() =>
+                      onChange({
+                        ...filters,
+                        origin: option.value === 'all' ? undefined : option.value,
+                      })
+                    }
+                  >
+                    {option.label}
+                  </Button>
+                )
+              })}
+            </div>
+          </div>
+          <ListMenuSeparator />
           <div className="flex items-center justify-between gap-3 px-1 py-1">
             <Label htmlFor="filter-has-salary" className="text-sm">
               Has salary

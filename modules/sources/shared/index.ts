@@ -1,9 +1,12 @@
 export { fail, type IpcResult, ok } from './ipc'
 export {
   type FeedFilters,
+  isAgentSource,
   JOB_STATUSES,
+  type JobOrigin,
   type JobSalary,
   type JobStatus,
+  MAILBOX_SOURCE_IDS,
   type NormalizedJob,
   type SalaryPeriod,
   SOURCE_IDS,

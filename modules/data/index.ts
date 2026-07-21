@@ -17,9 +17,11 @@ export type {
   WorkMode,
 } from '@sources/shared'
 export type {
+  AgentPipelineStats,
   AgentTraceEvent,
   AppSettings,
   MailboxAccountInfo,
+  ModelChoice,
   ModelProgressEvent,
   ModelState,
   ModelStatus,
@@ -38,9 +40,15 @@ export {
 } from './client'
 export { useAgentTrace, useAgentTraceCollector } from './hooks/use-agent-trace'
 export { useModelProgress } from './hooks/use-model-progress'
+export {
+  type ResizablePanel,
+  type ResizablePanelOptions,
+  useResizablePanel,
+} from './hooks/use-resizable-panel'
 export { useSyncEventInvalidation, useSyncEvents } from './hooks/use-sync-events'
 export { unwrap } from './ipc'
 export { keys, type QueryKeys } from './keys'
+export { usePauseAgent, useResumeAgent, useStopAgent } from './mutations/agent'
 export {
   type SetJobHiddenVariables,
   type SetJobNotesVariables,
@@ -49,7 +57,11 @@ export {
   useSetJobNotes,
   useSetJobStatus,
 } from './mutations/jobs'
-export { useMarkFeedVisited, useSetStoredFeedFilters } from './mutations/local'
+export {
+  useMarkFeedVisited,
+  useSetStoredFeedFilters,
+  useSetStoredPanelWidths,
+} from './mutations/local'
 export {
   type AddMailboxAccountVariables,
   useAddMailboxAccount,
@@ -59,6 +71,7 @@ export {
   useCancelModelDownload,
   useDownloadModel,
   useRemoveModel,
+  useSelectModel,
   useSetModelEnabled,
 } from './mutations/model'
 export { useSetAppSettings } from './mutations/settings'
@@ -74,11 +87,15 @@ export { useSyncNow } from './mutations/sync'
 export { useSetTheme } from './mutations/theme'
 export { useFeed, useJob } from './queries/jobs'
 export {
+  DEFAULT_PANEL_WIDTHS,
   FEED_FILTERS_STORAGE_KEY,
   LAST_FEED_VISIT_STORAGE_KEY,
+  type PanelWidths,
   readStoredFeedFilters,
+  readStoredPanelWidths,
   useLastFeedVisit,
   useStoredFeedFilters,
+  useStoredPanelWidths,
 } from './queries/local'
 export { useMailboxAccounts } from './queries/mailbox'
 export { useModelStatus } from './queries/model'

@@ -68,6 +68,14 @@ export function cleanText(input: string): string {
 // through dompurify instead.
 export function stripHtml(input: string): string {
   const decoded = input
+    // Drop the CONTENT of style/script/head blocks and comments FIRST —
+    // otherwise inline CSS/JS (enormous in marketing emails like LinkedIn)
+    // survives as text and can crowd the real content out past a truncation
+    // limit, leaving the model with nothing but gibberish.
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<head[\s\S]*?<\/head>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
     .replace(/<[^>]*>/g, ' ')
     .replace(/&nbsp;/gi, ' ')
     .replace(/&quot;/gi, '"')
@@ -76,6 +84,24 @@ export function stripHtml(input: string): string {
     .replace(/&gt;/gi, '>')
     .replace(/&amp;/gi, '&')
   return cleanText(decoded)
+}
+
+// Like stripHtml, but preserves anchor targets as "text (url)". Critical for
+// job emails: the apply link lives in the <a href>, not the visible text
+// ("View" / "Apply"), so plain stripHtml would delete every URL and the model
+// could never produce a valid applyUrl — dropping every real job.
+export function stripHtmlKeepingLinks(input: string): string {
+  const withLinkUrls = input.replace(
+    /<a\b[^>]*\bhref=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi,
+    (_match, url: string, inner: string) => {
+      const label = inner
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+      return label === '' ? ` ${url} ` : ` ${label} (${url}) `
+    },
+  )
+  return stripHtml(withLinkUrls)
 }
 
 // Provider dates arrive as ISO strings (most), unix seconds (Arbeitnow

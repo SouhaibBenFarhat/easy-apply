@@ -1,5 +1,5 @@
 import type { FeedFilters, StoredJob } from '@sources/shared'
-import { DEFAULT_SEARCH_PROFILE } from '@sources/shared'
+import { DEFAULT_SEARCH_PROFILE, isAgentSource } from '@sources/shared'
 import type {
   AgentTraceEvent,
   AppSettings,
@@ -35,6 +35,23 @@ const DEFAULT_MODEL_STATUS: ModelStatus = {
   downloadedBytes: 0,
   error: null,
   enabled: true,
+  reasoning: false,
+  catalog: [
+    {
+      id: 'llama-3.1-8b-instruct-q4',
+      displayName: 'Llama 3.1 8B Instruct (Q4)',
+      sizeBytes: 4_920_000_000,
+      reasoning: false,
+      installed: false,
+    },
+    {
+      id: 'deepseek-r1-distill-qwen-14b-q4',
+      displayName: 'DeepSeek-R1 Distill 14B (Q4)',
+      sizeBytes: 8_990_000_000,
+      reasoning: true,
+      installed: false,
+    },
+  ],
 }
 
 // Sensible defaults mirroring the real registry (same order): the five
@@ -143,6 +160,8 @@ function applyFeedFilters(rows: StoredJob[], filters: FeedFilters): StoredJob[] 
     )
       return false
     if (filters.sources && !filters.sources.includes(job.sourceId)) return false
+    if (filters.origin === 'agent' && !isAgentSource(job.sourceId)) return false
+    if (filters.origin === 'api' && isAgentSource(job.sourceId)) return false
     if (filters.hasSalary === true && job.salary.min === null && job.salary.max === null)
       return false
     if (filters.search !== undefined && filters.search.trim() !== '') {
@@ -247,6 +266,21 @@ export function createMockElectron(seed: MockElectronSeed = {}): ElectronAPI {
       modelStatus = { ...modelStatus, enabled }
       return { success: true, data: { ...modelStatus } }
     },
+    select: async (modelId) => {
+      const choice = modelStatus.catalog.find((entry) => entry.id === modelId)
+      if (choice === undefined) return { success: false, error: `unknown model ${modelId}` }
+      modelStatus = {
+        ...modelStatus,
+        modelId: choice.id,
+        displayName: choice.displayName,
+        totalBytes: choice.sizeBytes,
+        reasoning: choice.reasoning,
+        state: choice.installed ? 'ready' : 'absent',
+        downloadedBytes: choice.installed ? choice.sizeBytes : 0,
+        error: null,
+      }
+      return { success: true, data: { ...modelStatus } }
+    },
     onProgress: (callback) => {
       modelListeners.add(callback)
       return () => {
@@ -286,6 +320,9 @@ export function createMockElectron(seed: MockElectronSeed = {}): ElectronAPI {
         traceListeners.delete(callback)
       }
     },
+    stop: async () => ({ success: true, data: false }),
+    pause: async () => ({ success: true, data: false }),
+    resume: async () => ({ success: true, data: false }),
   }
   traceListenersByNamespace.set(agent, traceListeners)
 

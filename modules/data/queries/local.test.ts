@@ -30,12 +30,18 @@ describe('readStoredFeedFilters', () => {
   it('round-trips valid stored filters', () => {
     localStorage.setItem(
       FEED_FILTERS_STORAGE_KEY,
-      JSON.stringify({ workModes: ['remote'], hasSalary: true, sources: ['ba', 'adzuna'] }),
+      JSON.stringify({
+        workModes: ['remote'],
+        hasSalary: true,
+        sources: ['ba', 'adzuna'],
+        origin: 'agent',
+      }),
     )
     expect(readStoredFeedFilters()).toEqual({
       workModes: ['remote'],
       hasSalary: true,
       sources: ['ba', 'adzuna'],
+      origin: 'agent',
     })
   })
 

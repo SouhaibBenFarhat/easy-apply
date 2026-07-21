@@ -1,9 +1,9 @@
 import type { ThemeVariant } from '@data'
-import { useAgentTraceCollector, useSetTheme, useTheme } from '@data'
+import { useAgentTraceCollector, useResizablePanel, useSetTheme, useTheme } from '@data'
 import type { SidebarNavItem } from '@shell'
 import { AppHeader, Sidebar } from '@shell'
 import { Outlet, useRouter, useRouterState } from '@tanstack/react-router'
-import { Toaster, TooltipProvider } from '@ui-kit'
+import { ResizeHandle, Toaster, TooltipProvider } from '@ui-kit'
 import { ClipboardList, Plug, Rss, Settings } from 'lucide-react'
 import { type ReactElement, useState } from 'react'
 import { AgentMonitorButton } from './AgentMonitorButton'
@@ -36,6 +36,7 @@ export function RootLayout(): ReactElement {
   const setTheme = useSetTheme()
   const { syncing, onSyncNow } = useSyncControls()
   const [monitorOpen, setMonitorOpen] = useState(false)
+  const activityPanel = useResizablePanel('activity', { min: 260, max: 520, grows: 'left' })
   useAgentTraceCollector() // stream agent:trace events into the cache
   useAppKeyboard(router)
 
@@ -64,12 +65,26 @@ export function RootLayout(): ReactElement {
             />
           </AppHeader>
           <ModelBanner onOpen={() => void router.navigate({ to: '/settings' })} />
-          {/* The activity panel pushes the content (not an overlay). */}
+          {/* The activity panel pushes the content (not an overlay) and is
+              resizable via the handle on its left edge. */}
           <div className="flex min-h-0 flex-1">
             <div className="min-w-0 flex-1">
               <Outlet />
             </div>
-            {monitorOpen ? <AgentTimeline onClose={() => setMonitorOpen(false)} /> : null}
+            {monitorOpen ? (
+              <>
+                <ResizeHandle
+                  aria-label="Resize activity panel"
+                  value={activityPanel.width}
+                  min={activityPanel.min}
+                  max={activityPanel.max}
+                  onResizeStart={activityPanel.onResizeStart}
+                  onResize={activityPanel.onResize}
+                  onResizeEnd={activityPanel.onResizeEnd}
+                />
+                <AgentTimeline width={activityPanel.width} onClose={() => setMonitorOpen(false)} />
+              </>
+            ) : null}
           </div>
         </main>
       </div>

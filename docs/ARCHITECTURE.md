@@ -5,6 +5,10 @@ I/O, parsing, and storage live in the Electron main process; the renderer is a
 pure read/act client over typed IPC. This document maps the moving parts to
 the code.
 
+> For the AI/email-agent path in depth — how an inbox email becomes a feed job
+> through the on-device LLM, with flow diagrams — see
+> [`AI-ARCHITECTURE.md`](AI-ARCHITECTURE.md).
+
 ## Process split
 
 Job boards don't send CORS headers, and some (RemoteOK, WWR) have historically

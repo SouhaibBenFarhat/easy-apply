@@ -2,7 +2,12 @@ import type { FeedFilters } from '@sources/shared'
 import type { UseMutationResult } from '@tanstack/react-query'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { keys } from '../keys'
-import { FEED_FILTERS_STORAGE_KEY, LAST_FEED_VISIT_STORAGE_KEY } from '../queries/local'
+import {
+  FEED_FILTERS_STORAGE_KEY,
+  LAST_FEED_VISIT_STORAGE_KEY,
+  PANEL_WIDTHS_STORAGE_KEY,
+  type PanelWidths,
+} from '../queries/local'
 
 // Written on feed blur/visit (PR 12) — moves the "new since last visit"
 // divider. localStorage is the source of truth; the cache write keeps every
@@ -19,6 +24,20 @@ export function useSetStoredFeedFilters(): UseMutationResult<FeedFilters, Error,
     },
     onSuccess: (persisted) => {
       client.setQueryData(keys.local.feedFilters, persisted)
+    },
+  })
+}
+
+// Persists the resizable panel widths (job list, activity panel).
+export function useSetStoredPanelWidths(): UseMutationResult<PanelWidths, Error, PanelWidths> {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (next) => {
+      localStorage.setItem(PANEL_WIDTHS_STORAGE_KEY, JSON.stringify(next))
+      return next
+    },
+    onSuccess: (saved) => {
+      client.setQueryData(keys.local.panelWidths, saved)
     },
   })
 }

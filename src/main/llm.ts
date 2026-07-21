@@ -7,6 +7,14 @@ import { getLlama, type Llama, LlamaChatSession, type LlamaModel } from 'node-ll
 // its RAM (the several GB the user can turn off). Electron glue —
 // coverage-excluded and unverifiable in my sandbox (needs the model + Metal).
 
+// Memory cap. Left to itself, node-llama-cpp auto-sizes the context (KV cache)
+// to whatever RAM is free — grabbing gigabytes. A bounded context keeps runtime
+// memory in check WITHOUT touching the weights (so no loss of intelligence,
+// just a shorter working window). With mmap'd weights, the 8B model then sits
+// around ~6 GB. This bounds the *context*, not the weights — a 14B's weights
+// alone exceed 6 GB, so it inherently needs more.
+const CONTEXT_SIZE = 4096
+
 export interface DisposableLlm extends LlmClient {
   dispose(): Promise<void>
 }
@@ -18,7 +26,9 @@ export function createLlamaClient(modelPath: string): DisposableLlm {
     if (loaded === null) {
       loaded = (async () => {
         const llama = await getLlama()
-        const model = await llama.loadModel({ modelPath })
+        // mmap: stream weights from disk (OS pages them in/out) rather than
+        // locking them; mlock off so the OS can reclaim pages under pressure.
+        const model = await llama.loadModel({ modelPath, useMmap: true, useMlock: false })
         return { llama, model }
       })()
     }
@@ -26,12 +36,28 @@ export function createLlamaClient(modelPath: string): DisposableLlm {
   }
 
   return {
-    complete: async (prompt: string): Promise<string> => {
+    complete: async (prompt: string, options?: { signal?: AbortSignal }): Promise<string> => {
       const { model } = await load()
-      const context = await model.createContext()
+      const context = await model.createContext({ contextSize: CONTEXT_SIZE })
       try {
         const session = new LlamaChatSession({ contextSequence: context.getSequence() })
-        return await session.prompt(prompt)
+        // Reasoning models (DeepSeek-R1, …) emit their chain-of-thought as a
+        // separate "thought" segment — node-llama-cpp keeps it OUT of the value
+        // prompt() returns. Collect it via onResponseChunk and re-wrap it as a
+        // <think>…</think> block so the trace layer's splitThinking() can surface
+        // it while the extractor still receives clean JSON.
+        // `signal` + stopOnAbortSignal makes Stop halt generation mid-stream
+        // (returning whatever was produced) rather than waiting for the email.
+        let thought = ''
+        const answer = await session.prompt(prompt, {
+          signal: options?.signal,
+          stopOnAbortSignal: true,
+          onResponseChunk: (chunk) => {
+            if (chunk.type === 'segment' && chunk.segmentType === 'thought') thought += chunk.text
+          },
+        })
+        const trimmed = thought.trim()
+        return trimmed === '' ? answer : `<think>${trimmed}</think>${answer}`
       } finally {
         await context.dispose()
       }

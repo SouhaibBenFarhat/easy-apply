@@ -45,6 +45,7 @@ const api = {
     cancel: () => ipcRenderer.invoke('model:cancel'),
     remove: () => ipcRenderer.invoke('model:remove'),
     setEnabled: (enabled: boolean) => ipcRenderer.invoke('model:set-enabled', enabled),
+    select: (modelId: string) => ipcRenderer.invoke('model:select', modelId),
     onProgress: (callback: (event: unknown) => void) => {
       const listener = (_event: IpcRendererEvent, payload: unknown): void => callback(payload)
       ipcRenderer.on('model:progress', listener)
@@ -74,6 +75,9 @@ const api = {
         ipcRenderer.removeListener('agent:trace', listener)
       }
     },
+    stop: () => ipcRenderer.invoke('agent:stop'),
+    pause: () => ipcRenderer.invoke('agent:pause'),
+    resume: () => ipcRenderer.invoke('agent:resume'),
   },
 }
 

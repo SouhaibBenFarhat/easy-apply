@@ -45,6 +45,24 @@ export const SOURCE_IDS: readonly SourceId[] = [
   'xing',
 ]
 
+// The email-agent sources: jobs the on-device LLM extracted from the user's
+// inbox. No direct API exists for these boards, so the sourceId alone is an
+// authoritative "found by the agent" signal; everything else is API-sourced.
+export const MAILBOX_SOURCE_IDS: readonly SourceId[] = [
+  'mailbox',
+  'linkedin',
+  'indeed',
+  'stepstone',
+  'xing',
+]
+
+// Where a job came from: the inbox agent (LLM email extraction) or a source API.
+export type JobOrigin = 'agent' | 'api'
+
+export function isAgentSource(sourceId: SourceId): boolean {
+  return (MAILBOX_SOURCE_IDS as readonly string[]).includes(sourceId)
+}
+
 export type WorkMode = 'onsite' | 'hybrid' | 'remote' | 'unknown'
 
 export const WORK_MODES: readonly WorkMode[] = ['onsite', 'hybrid', 'remote', 'unknown']
@@ -98,6 +116,7 @@ export interface FeedFilters {
   workModes?: WorkMode[]
   remoteScopes?: RemoteScope[]
   sources?: SourceId[]
+  origin?: JobOrigin // 'agent' (inbox) | 'api'; omitted = both
   hasSalary?: boolean
   search?: string
   status?: JobStatus | 'none'

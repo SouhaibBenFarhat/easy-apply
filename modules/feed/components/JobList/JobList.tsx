@@ -1,7 +1,9 @@
 import type { JobStatus, StoredJob } from '@sources/shared'
+import { isAgentSource } from '@sources/shared'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { BadgeProps } from '@ui-kit'
 import { Badge, cn, formatRelativeTime } from '@ui-kit'
+import { Sparkles } from 'lucide-react'
 import type { CSSProperties, ReactElement } from 'react'
 import { useMemo, useRef, useState } from 'react'
 import { formatSalary, remoteScopeLabel, workModeLabel } from '../../lib/format'
@@ -140,6 +142,9 @@ export function JobList({
               : rawPlace
           const metaLeft = place === null ? job.company : `${job.company} · ${place}`
           const metaRight = `${formatRelativeTime(job.postedAt ?? job.firstSeenAt)} · ${sourceNames[job.sourceId] ?? job.sourceId}`
+          // Jobs the inbox agent extracted get a sparkle accent (info, never
+          // copper — copper stays scarce).
+          const fromAgent = isAgentSource(job.sourceId)
           return (
             <div key={item.key} style={style}>
               <button
@@ -179,10 +184,21 @@ export function JobList({
                     meta starting at the same x — no chip zigzag. */}
                 {/* Time + source are right-anchored and never truncate; the
                     company/place group absorbs all the squeeze. */}
-                <span className="label-caps flex w-full items-baseline gap-2">
-                  <span className="w-[4.5rem] shrink-0">{workModeLabel(job.workMode)}</span>
+                {/* Tight tracking (label-caps defaults to 0.18em, which eats
+                    horizontal room) + a slim mode slot + small gaps, so the
+                    company/place shows as much as possible before truncating. */}
+                <span className="label-caps flex w-full items-baseline gap-1.5 tracking-[0.02em]">
+                  <span className="w-14 shrink-0">{workModeLabel(job.workMode)}</span>
                   <span className="min-w-0 flex-1 truncate">{metaLeft}</span>
-                  <span className="shrink-0">{metaRight}</span>
+                  <span className="flex shrink-0 items-center gap-1">
+                    {fromAgent ? (
+                      <Sparkles
+                        className="size-3 text-info"
+                        aria-label="Found by the inbox agent"
+                      />
+                    ) : null}
+                    {metaRight}
+                  </span>
                 </span>
                 {salary !== null ? (
                   // Third line: the salary as plain copper text — the figure

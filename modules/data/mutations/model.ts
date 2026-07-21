@@ -37,6 +37,19 @@ export function useRemoveModel(): UseMutationResult<ModelStatus, Error, void> {
   })
 }
 
+// Switches the active local model (e.g. Llama 8B → DeepSeek 14B). Cancels any
+// in-flight download and unloads the current model to free RAM; the picked
+// model's status returns.
+export function useSelectModel(): UseMutationResult<ModelStatus, Error, string> {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (modelId: string) => unwrap(await window.electron.model.select(modelId)),
+    onSuccess: (status) => {
+      client.setQueryData(keys.model.status, status)
+    },
+  })
+}
+
 // Turns the on-device AI on/off. Off unloads the model to free RAM (the model
 // file stays on disk); the mailbox source then skips email reading.
 export function useSetModelEnabled(): UseMutationResult<ModelStatus, Error, boolean> {

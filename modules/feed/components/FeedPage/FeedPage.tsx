@@ -3,6 +3,7 @@ import {
   useJob,
   useLastFeedVisit,
   useMarkFeedVisited,
+  useResizablePanel,
   useSetJobHidden,
   useSetJobNotes,
   useSetJobStatus,
@@ -11,7 +12,7 @@ import {
   useStoredFeedFilters,
 } from '@data'
 import type { FeedFilters } from '@sources/shared'
-import { Button, EmptyState, useDeferredLoading } from '@ui-kit'
+import { Button, EmptyState, ResizeHandle, useDeferredLoading } from '@ui-kit'
 import { FilterX, Inbox } from 'lucide-react'
 import type { ReactElement } from 'react'
 import { useEffect, useMemo, useState } from 'react'
@@ -37,6 +38,7 @@ export function FeedPage(): ReactElement {
   // `local` persistence namespace); the search text is ephemeral by design.
   const storedFilters = useStoredFeedFilters()
   const setStoredFilters = useSetStoredFeedFilters()
+  const jobsPanel = useResizablePanel('jobs', { min: 320, max: 720, grows: 'right' })
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
 
   // Search-by-company was removed: the filter bar is now tabs + a gear popover
@@ -105,8 +107,9 @@ export function FeedPage(): ReactElement {
   return (
     <div className="flex h-full min-h-0">
       {/* Job-list sidebar (§sidebars): body `background`, header (FilterBar) +
-          footer one step up on `surface`. */}
-      <div className="flex w-[420px] shrink-0 flex-col border-r border-border bg-background">
+          footer one step up on `surface`. Width is user-resizable (the handle
+          below is the divider, so no `border-r` here). */}
+      <div style={{ width: jobsPanel.width }} className="flex shrink-0 flex-col bg-background">
         <FilterBar filters={filters} sources={sources.data ?? []} onChange={setFilters} />
         {jobs.length === 0 ? (
           <EmptyState
@@ -137,6 +140,15 @@ export function FeedPage(): ReactElement {
           {jobs.length} {jobs.length === 1 ? 'job' : 'jobs'}
         </footer>
       </div>
+      <ResizeHandle
+        aria-label="Resize job list"
+        value={jobsPanel.width}
+        min={jobsPanel.min}
+        max={jobsPanel.max}
+        onResizeStart={jobsPanel.onResizeStart}
+        onResize={jobsPanel.onResize}
+        onResizeEnd={jobsPanel.onResizeEnd}
+      />
       <div className="min-w-0 flex-1">
         <JobDetailPane
           job={selectedJob}

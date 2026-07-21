@@ -36,6 +36,18 @@ describe('JobList', () => {
     expect(screen.getByRole('button', { name: /First job/ })).not.toHaveClass('animate-rise-in')
   })
 
+  it('marks inbox-agent jobs with a sparkle, not API jobs', () => {
+    renderList({
+      jobs: [
+        makeJob({ id: 'linkedin:x', sourceId: 'linkedin', title: 'Agent job' }),
+        makeJob({ id: 'remoteok:y', sourceId: 'remoteok', title: 'Api job' }),
+      ],
+      sourceNames: { linkedin: 'LinkedIn', remoteok: 'RemoteOK' },
+    })
+    // Exactly one sparkle — on the agent-sourced row.
+    expect(screen.getAllByLabelText('Found by the inbox agent')).toHaveLength(1)
+  })
+
   it('renders flat rows inside the scroll container (virtualizer smoke)', () => {
     const jobs = Array.from({ length: 30 }, (_, i) => makeJob({ title: `Job number ${i}` }))
     const { container } = renderList({ jobs })

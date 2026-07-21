@@ -138,9 +138,9 @@ export function JobDetailPane({
               href={job.url}
               target="_blank"
               rel="noreferrer"
-              className="label-caps transition-colors hover:text-primary"
+              className="label-caps inline-flex items-center gap-1 transition-colors hover:text-primary"
             >
-              via {attribution} ↗
+              via {attribution} <ExternalLink className="size-3" aria-hidden />
             </a>
           </footer>
         </div>
