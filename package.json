@@ -1,6 +1,7 @@
 {
   "name": "easy-apply",
   "version": "0.1.0",
+  "productName": "EasyApply",
   "description": "EasyApply — job postings aggregator for macOS. Munich + remote-EU jobs in one fast feed.",
   "type": "module",
   "main": "./out/main/index.js",
@@ -22,7 +23,51 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "generate:theme": "node scripts/generate-theme.mjs",
+    "build:unpack": "electron-vite build && electron-builder --dir",
+    "build:mac": "electron-vite build && electron-builder --mac --arm64",
     "prepare": "husky"
+  },
+  "build": {
+    "appId": "com.souhaibbenfarhat.easyapply",
+    "productName": "EasyApply",
+    "directories": {
+      "buildResources": "build"
+    },
+    "files": [
+      "out/**/*"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/@electric-sql/pglite/**"
+    ],
+    "extraResources": [
+      {
+        "from": "drizzle",
+        "to": "drizzle"
+      }
+    ],
+    "npmRebuild": false,
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "build/icon.icns",
+      "category": "public.app-category.productivity",
+      "artifactName": "EasyApply-${arch}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "SouhaibBenFarhat",
+        "repo": "easy-apply",
+        "releaseType": "release"
+      }
+    ]
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
@@ -56,6 +101,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.4",
+    "@resvg/resvg-js": "^2.6.2",
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
@@ -67,6 +113,7 @@
     "autoprefixer": "^10.5.4",
     "drizzle-kit": "^0.31.10",
     "electron": "^43.1.1",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "happy-dom": "^20.11.0",
     "husky": "^9.1.7",

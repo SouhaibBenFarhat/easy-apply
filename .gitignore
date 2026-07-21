@@ -1,6 +1,7 @@
 node_modules/
 out/
 dist/
+build/icon.iconset/
 coverage/
 .typecheck-temp/
 .vitest-reports/
