@@ -1,1 +1,467 @@
-<!doctype html><title>EasyApply</title><p>Landing page lands in PR 17.</p>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="icon.png" type="image/png" />
+  <title>EasyApply — every job worth applying to, in one feed</title>
+  <meta name="description" content="EasyApply is a macOS app that pulls Munich and remote-Europe jobs from six official sources into one deduplicated, newest-first feed. Free, open source, installable with Homebrew." />
+  <link rel="canonical" href="https://souhaibbenfarhat.github.io/easy-apply/" />
+  <meta name="author" content="Souhaib Ben Farhat" />
+
+  <meta property="og:title" content="EasyApply — every job worth applying to, in one feed" />
+  <meta property="og:description" content="A macOS app that pulls Munich and remote-Europe jobs from six official sources into one deduplicated, newest-first feed." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://souhaibbenfarhat.github.io/easy-apply/" />
+  <meta property="og:image" content="https://souhaibbenfarhat.github.io/easy-apply/icon.png" />
+  <meta name="twitter:card" content="summary" />
+
+  <meta name="theme-color" content="#f7f8f9" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#10171d" media="(prefers-color-scheme: dark)" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg: #f7f8f9;
+      --surface: #ffffff;
+      --text: #16222c;
+      --muted: #5b6b76;
+      --line: #e3e8ec;
+      --accent: #a06a38;
+      --accent-ink: #8a5a2e;
+      --heading: #1e3a4c;
+      --code-bg: rgba(22, 34, 44, 0.05);
+      --shadow-sm: 0 1px 2px rgba(22,34,44,.04), 0 1px 3px rgba(22,34,44,.06);
+      --shadow-md: 0 2px 4px rgba(22,34,44,.05), 0 6px 16px rgba(22,34,44,.08);
+      --shadow-lg: 0 8px 24px rgba(22,34,44,.10), 0 2px 6px rgba(22,34,44,.06);
+      --dur: 0.2s;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #10171d;
+        --surface: #16222c;
+        --text: #e8ecef;
+        --muted: #9fb0bc;
+        --line: #223240;
+        --accent: #c8894e;
+        --accent-ink: #e0a86b;
+        --heading: #e8ecef;
+        --code-bg: rgba(232, 236, 239, 0.07);
+        --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+        --shadow-md: 0 4px 14px rgba(0,0,0,.5);
+        --shadow-lg: 0 10px 30px rgba(0,0,0,.6);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    body { margin: 0; min-height: 100vh; }
+    a { color: inherit; text-decoration: none; }
+    ::selection { background: var(--accent); color: #fff; }
+    :where(a, button):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+    @media (prefers-reduced-motion: reduce) {
+      :root { --dur: 0s; }
+    }
+
+    .wrap { margin: 0 auto; width: 100%; max-width: 68rem; padding: 0 1.5rem; }
+    .display { font-family: 'Fraunces', ui-serif, Georgia, serif; letter-spacing: -0.02em; font-weight: 500; color: var(--heading); }
+    .muted { color: var(--muted); }
+    .label {
+      font-size: 0.7rem; font-weight: 500; text-transform: uppercase;
+      letter-spacing: 0.18em; color: var(--muted); margin: 0;
+    }
+    code {
+      background: var(--code-bg); border-radius: 6px; padding: 0.1em 0.4em;
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.85em;
+    }
+    .card {
+      background: var(--surface); border: 1px solid var(--line);
+      border-radius: 1rem; box-shadow: var(--shadow-sm);
+    }
+    .link-underline {
+      color: var(--accent); border-bottom: 1px solid transparent;
+      transition: border-color var(--dur), color var(--dur);
+    }
+    .link-underline:hover { border-color: var(--accent); color: var(--accent-ink); }
+
+    /* Top bar */
+    .top { border-bottom: 1px solid var(--line); }
+    .top .wrap { display: flex; align-items: center; justify-content: space-between; height: 3.5rem; }
+    .top a { font-size: 0.875rem; color: var(--muted); transition: color var(--dur); }
+    .top a:hover { color: var(--text); }
+
+    /* Hero */
+    .hero { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 5rem 0 4rem; }
+    .hero img.icon { width: 8rem; height: 8rem; filter: drop-shadow(0 12px 24px rgba(200, 137, 78, 0.30)); }
+    .hero h1 { font-size: clamp(2.5rem, 6vw, 3.25rem); margin: 1.75rem 0 0; }
+    .hero .tagline { max-width: 34rem; font-size: 1.125rem; line-height: 1.65; margin: 1rem 0 0; }
+
+    .brew {
+      display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+      width: 100%; max-width: 28rem; margin-top: 2rem; padding: 0.8rem 1rem;
+      background: var(--surface); border: 1px solid var(--line); border-radius: 0.75rem;
+      box-shadow: var(--shadow-sm); cursor: pointer; text-align: left;
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.82rem; color: var(--text);
+      transition: box-shadow var(--dur);
+    }
+    .brew:hover { box-shadow: var(--shadow-md); }
+    .brew .copy {
+      flex-shrink: 0; font-family: 'Inter', sans-serif; font-size: 0.7rem; font-weight: 500;
+      text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted);
+    }
+    .brew:hover .copy { color: var(--accent); }
+
+    /* App-window mockup — always the dark petrol theme, the flagship look */
+    .mock { padding: 0 1.5rem 5rem; }
+    .win {
+      max-width: 700px; margin: 0 auto; overflow: hidden; text-align: left;
+      background: #10171d; border: 1px solid #223240; border-radius: 0.85rem;
+      box-shadow: var(--shadow-lg);
+    }
+    .win-head {
+      display: flex; align-items: center; gap: 0.75rem; padding: 0.55rem 0.85rem;
+      background: rgba(40, 58, 73, 0.72); border-bottom: 1px solid #223240;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    }
+    .lights { display: flex; gap: 0.4rem; }
+    .lights span { width: 0.6rem; height: 0.6rem; border-radius: 50%; }
+    .win-title { font-size: 0.72rem; font-weight: 600; color: #e8ecef; }
+    .win-sync { margin-left: auto; display: flex; align-items: center; gap: 0.35rem; font-size: 0.62rem; color: #9fb0bc; }
+    .win-sync svg { width: 0.7rem; height: 0.7rem; }
+    .win-body { display: grid; grid-template-columns: 8.5rem 1fr 12.5rem; }
+    .win-side {
+      display: flex; flex-direction: column; gap: 0.15rem;
+      padding: 0.6rem 0.5rem; background: #131c24; border-right: 1px solid #223240;
+    }
+    .side-item {
+      display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.55rem;
+      border-radius: 0.45rem; font-size: 0.7rem; color: #9fb0bc;
+    }
+    .side-item svg { width: 0.8rem; height: 0.8rem; flex-shrink: 0; }
+    .side-item .count { margin-left: auto; font-size: 0.6rem; }
+    .side-item.active { color: #e0a86b; background: rgba(200, 137, 78, 0.12); font-weight: 600; }
+    .win-feed { display: flex; flex-direction: column; border-right: 1px solid #223240; }
+    .feed-bar {
+      display: flex; justify-content: space-between; gap: 0.5rem; padding: 0.45rem 0.75rem;
+      font-size: 0.62rem; color: #9fb0bc; border-bottom: 1px solid #223240;
+    }
+    .job {
+      display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 0.75rem 0.55rem 0.6rem;
+      border-left: 3px solid transparent; border-bottom: 1px solid #1a2530;
+    }
+    .job:last-child { border-bottom: none; }
+    .job.sel { border-left-color: #c8894e; background: #1c2a36; }
+    .job-x { flex: 1; min-width: 0; }
+    .job p { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .job-t { font-size: 0.7rem; font-weight: 600; color: #e8ecef; }
+    .job .job-m { font-size: 0.6rem; color: #9fb0bc; margin-top: 0.12rem; }
+    .b {
+      flex-shrink: 0; font-size: 0.56rem; font-weight: 600; padding: 0.14rem 0.45rem;
+      border-radius: 999px; border: 1px solid #2b3f50; color: #9fb0bc; white-space: nowrap;
+    }
+    .b.copper { color: #e0a86b; border-color: rgba(200, 137, 78, 0.4); background: rgba(200, 137, 78, 0.13); }
+    .win-detail { display: flex; flex-direction: column; gap: 0.45rem; padding: 0.8rem 0.85rem; background: #121b23; }
+    .win-detail p { margin: 0; }
+    .det-t { font-size: 0.78rem; font-weight: 600; color: #e8ecef; }
+    .det-m { font-size: 0.62rem; color: #9fb0bc; }
+    .det-s { font-size: 0.66rem; font-weight: 600; color: #e0a86b; }
+    .det-apply {
+      align-self: flex-start; margin-top: 0.2rem; padding: 0.32rem 0.7rem;
+      background: #c8894e; color: #10171d; border-radius: 0.45rem;
+      font-size: 0.64rem; font-weight: 600;
+    }
+    .det-via { font-size: 0.58rem; color: #9fb0bc; }
+    .det-sk { height: 0.42rem; border-radius: 999px; background: #1c2833; }
+    .mock-caption { max-width: 700px; margin: 1rem auto 0; text-align: center; font-size: 0.78rem; color: var(--muted); }
+    @media (max-width: 720px) {
+      .win-body { grid-template-columns: 8.5rem 1fr; }
+      .win-detail { display: none; }
+    }
+    @media (max-width: 480px) {
+      .win-body { grid-template-columns: 1fr; }
+      .win-side { display: none; }
+    }
+
+    /* Sections */
+    section.band { border-top: 1px solid var(--line); }
+    section.band .wrap { padding: 4.5rem 1.5rem; }
+    h2.section { font-size: clamp(1.75rem, 4vw, 2.25rem); line-height: 1.15; margin: 1rem 0 0; max-width: 38rem; }
+    h2.small { font-size: clamp(1.4rem, 3vw, 1.75rem); margin: 1rem 0 0; }
+    .lede { max-width: 46rem; font-size: 0.95rem; line-height: 1.7; margin: 1.25rem 0 0; }
+
+    .features { display: grid; gap: 1rem; margin-top: 2.5rem; }
+    @media (min-width: 640px) { .features { grid-template-columns: 1fr 1fr; } }
+    .features .card { padding: 1.5rem; }
+    .features h3 { font-family: 'Fraunces', serif; font-size: 1.125rem; font-weight: 500; letter-spacing: -0.01em; margin: 0; color: var(--heading); }
+    .features p { font-size: 0.92rem; line-height: 1.65; color: var(--muted); margin: 0.5rem 0 0; }
+
+    .duo { display: grid; gap: 3rem; }
+    @media (min-width: 768px) { .duo { grid-template-columns: 1fr 1fr; } }
+    .steps { list-style: none; margin: 1.5rem 0 0; padding: 0; font-size: 0.95rem; line-height: 1.7; }
+    .steps li { display: flex; gap: 0.75rem; margin-bottom: 1rem; }
+    .steps .n { font-family: ui-monospace, monospace; color: var(--accent); }
+    .note { font-size: 0.88rem; line-height: 1.7; color: var(--muted); margin-top: 1.5rem; }
+
+    .specs { margin: 1.5rem 0 0; padding: 0 1.25rem; }
+    .specs > div {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 1.5rem;
+      padding: 0.75rem 0; border-top: 1px solid var(--line);
+    }
+    .specs > div:first-child { border-top: none; }
+    .specs dt { flex-shrink: 0; font-size: 0.82rem; font-weight: 500; color: var(--muted); }
+    .specs dd { margin: 0; font-size: 0.9rem; text-align: right; }
+
+    .terminal {
+      max-width: 42rem; margin-top: 2rem; padding: 1.5rem; overflow-x: auto;
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.85rem; line-height: 1.75;
+    }
+    .terminal p { margin: 0; white-space: nowrap; }
+    .terminal p.gap { margin-top: 1rem; }
+    .terminal .c { color: var(--muted); user-select: none; }
+
+    footer { border-top: 1px solid var(--line); }
+    footer .wrap {
+      display: flex; align-items: center; justify-content: space-between;
+      height: 4rem; font-size: 0.82rem; color: var(--muted);
+    }
+    footer .wrap a:hover { color: var(--text); }
+  </style>
+</head>
+
+<body>
+  <header class="top">
+    <div class="wrap">
+      <a href="https://souhaibbenfarhat.github.io">← Souhaib Ben Farhat</a>
+      <a href="https://github.com/SouhaibBenFarhat/easy-apply" rel="noopener">GitHub ↗</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero wrap">
+      <img class="icon" src="icon.png" alt="EasyApply app icon" width="128" height="128" />
+      <h1 class="display">EasyApply</h1>
+      <p class="tagline muted">Every job worth applying to — Munich and remote<br />Europe — in one fast feed.</p>
+
+      <button class="brew" id="copy-brew" type="button" aria-label="Copy install command">
+        <span><span class="c">$ </span>brew install --cask souhaibbenfarhat/tap/easyapply</span>
+        <span class="copy" data-copy-label>copy</span>
+      </button>
+      <p style="margin-top:1rem"><a class="link-underline" style="font-size:0.875rem" href="https://github.com/SouhaibBenFarhat/easy-apply" rel="noopener">View source on GitHub</a></p>
+    </section>
+
+    <section class="mock" aria-label="Mockup of the EasyApply window: a dark petrol app with a sidebar, a deduplicated job feed, and a detail pane">
+      <div class="win" aria-hidden="true">
+        <div class="win-head">
+          <span class="lights">
+            <span style="background:#ff5f57"></span>
+            <span style="background:#febc2e"></span>
+            <span style="background:#28c840"></span>
+          </span>
+          <span class="win-title">EasyApply</span>
+          <span class="win-sync">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 12a9 9 0 1 1-2.9-6.6" />
+              <path d="M21 3v5h-5" />
+            </svg>
+            Synced 2 min ago
+          </span>
+        </div>
+        <div class="win-body">
+          <nav class="win-side">
+            <span class="side-item active">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <path d="M4 6h16M4 12h16M4 18h10" />
+              </svg>
+              Feed <span class="count">128</span>
+            </span>
+            <span class="side-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="4" width="5" height="16" rx="1" />
+                <rect x="10" y="4" width="5" height="10" rx="1" />
+                <rect x="17" y="4" width="5" height="7" rx="1" />
+              </svg>
+              Tracker <span class="count">7</span>
+            </span>
+            <span class="side-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
+              </svg>
+              Sources
+            </span>
+            <span class="side-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <path d="M4 8h8M18 8h2M4 16h2M12 16h8" />
+                <circle cx="15" cy="8" r="2" />
+                <circle cx="9" cy="16" r="2" />
+              </svg>
+              Settings
+            </span>
+          </nav>
+          <div class="win-feed">
+            <div class="feed-bar"><span>128 jobs · newest first</span><span>Munich + Remote EU</span></div>
+            <div class="job">
+              <div class="job-x">
+                <p class="job-t">Senior Frontend Engineer (m/w/d)</p>
+                <p class="job-m">BAUHAUS AG · München · 2h ago</p>
+              </div>
+              <span class="b">Hybrid</span>
+            </div>
+            <div class="job sel">
+              <div class="job-x">
+                <p class="job-t">Staff Frontend Engineer</p>
+                <p class="job-m">Nordhealth · Remote (EU) · 3h ago</p>
+              </div>
+              <span class="b copper">€75k–€95k</span>
+            </div>
+            <div class="job">
+              <div class="job-x">
+                <p class="job-t">Senior Backend Engineer</p>
+                <p class="job-m">Automattic · Worldwide · 5h ago · via WeWorkRemotely</p>
+              </div>
+              <span class="b">Remote</span>
+            </div>
+            <div class="job">
+              <div class="job-x">
+                <p class="job-t">Fullstack Developer (m/w/d)</p>
+                <p class="job-m">CHECK24 · München · 6h ago</p>
+              </div>
+              <span class="b">On-site</span>
+            </div>
+            <div class="job">
+              <div class="job-x">
+                <p class="job-t">Frontend Engineer</p>
+                <p class="job-m">Solaris · Remote (DE) · 9h ago · via Arbeitnow</p>
+              </div>
+            </div>
+          </div>
+          <div class="win-detail">
+            <p class="det-t">Staff Frontend Engineer</p>
+            <p class="det-m">Nordhealth · Remote (EU) · full-time</p>
+            <p class="det-s">€75k–€95k</p>
+            <span class="det-apply">Apply ↗</span>
+            <p class="det-via">via Himalayas ↗</p>
+            <div class="det-sk" style="margin-top:0.35rem"></div>
+            <div class="det-sk" style="width:92%"></div>
+            <div class="det-sk" style="width:76%"></div>
+          </div>
+        </div>
+      </div>
+      <p class="mock-caption">The feed — six sources, one deduplicated list, salary where it's stated. Not a screenshot: pure HTML.</p>
+    </section>
+
+    <section class="band">
+      <div class="wrap">
+        <p class="label">Why it exists</p>
+        <h2 class="display section">Job hunting means six tabs, six logins, and the same posting three times.</h2>
+        <p class="lede muted">
+          Arbeitsagentur for Munich, four remote boards, Adzuna for the rest — each with its
+          own search, its own noise, and the same role reposted under three names. EasyApply
+          pulls every source with a real API into one deduplicated, newest-first feed on your
+          Mac, and stays out of your way.
+        </p>
+
+        <div class="features">
+          <div class="card">
+            <h3>One feed, not six tabs</h3>
+            <p>Arbeitsagentur, Adzuna, Arbeitnow, Himalayas, RemoteOK, WeWorkRemotely — official APIs and feeds only, no scraping. Cross-source duplicates collapse into a single row.</p>
+          </div>
+          <div class="card">
+            <h3>Salary up front</h3>
+            <p>Postings that state pay get a copper badge in the feed, so you can rank before you read. Adzuna's model estimates are marked with a <code>~</code> instead of passed off as fact.</p>
+          </div>
+          <div class="card">
+            <h3>A tracker, not a spreadsheet</h3>
+            <p>Interested → Applied → Interview → Rejected, with notes — attached to the posting itself. A job is never lost, and never applied to twice.</p>
+          </div>
+          <div class="card">
+            <h3>Polite and local</h3>
+            <p>Per-source rate limits, spaced sequential requests, and a "via source ↗" link on every posting. Jobs live in a local database, API keys are OS-encrypted — no accounts, no telemetry.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="wrap duo">
+        <div>
+          <p class="label">How it works</p>
+          <h2 class="display small">Honest plumbing</h2>
+          <ol class="steps">
+            <li><span class="n">1.</span><span>Sync — the main process fetches each source on an interval, one at a time, inside its published rate limits.</span></li>
+            <li><span class="n">2.</span><span>Normalize + dedupe — six response shapes become one job model, and the same role from two boards collapses into one row.</span></li>
+            <li><span class="n">3.</span><span>Local PGlite — everything lands in a Postgres-in-a-file on your disk. Nothing leaves the machine except the API requests themselves.</span></li>
+            <li><span class="n">4.</span><span>You apply — every posting links out to the original source. Set a status, add a note, move on.</span></li>
+          </ol>
+          <p class="note">No accounts, no cloud, no telemetry. Your statuses and notes never sync anywhere.</p>
+        </div>
+
+        <div>
+          <p class="label">Specs</p>
+          <h2 class="display small">At a glance</h2>
+          <dl class="specs card">
+            <div><dt>Version</dt><dd>0.1.0</dd></div>
+            <div><dt>Platform</dt><dd>macOS 14+ · Apple Silicon</dd></div>
+            <div><dt>Sources</dt><dd>6 — official APIs &amp; feeds</dd></div>
+            <div><dt>Built with</dt><dd>Electron · React · PGlite</dd></div>
+            <div><dt>License</dt><dd>MIT — open source</dd></div>
+            <div><dt>Distribution</dt><dd>Homebrew tap · GitHub Releases</dd></div>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="wrap">
+        <p class="label">Install</p>
+        <h2 class="display small">Up and running in one command</h2>
+        <div class="terminal card">
+          <p><span class="c"># install</span></p>
+          <p>brew install --cask souhaibbenfarhat/tap/easyapply</p>
+          <p class="gap"><span class="c"># upgrade</span></p>
+          <p>brew upgrade --cask easyapply</p>
+          <p class="gap"><span class="c"># uninstall</span></p>
+          <p>brew uninstall --cask easyapply</p>
+          <p class="gap"><span class="c"># installed manually from the dmg instead? clear Gatekeeper's</span></p>
+          <p class="gap" style="margin-top:0"><span class="c"># quarantine flag once, so the app opens without a "damaged" warning</span></p>
+          <p>xattr -dr com.apple.quarantine /Applications/EasyApply.app</p>
+        </div>
+        <p class="note" style="max-width:46rem">
+          EasyApply isn't notarized by Apple (it's ad-hoc signed) — the Homebrew cask clears the
+          quarantine flag for you on install, so the <code>xattr</code> line is only needed if you
+          download the dmg from GitHub Releases yourself. Either way, you can always audit
+          <a class="link-underline" href="https://github.com/SouhaibBenFarhat/easy-apply" rel="noopener">the source</a>.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a href="https://souhaibbenfarhat.github.io">Built by Souhaib Ben Farhat</a>
+      <span>MIT · © 2026</span>
+    </div>
+  </footer>
+
+  <script>
+    const btn = document.getElementById('copy-brew');
+    const label = btn.querySelector('[data-copy-label]');
+    btn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText('brew install --cask souhaibbenfarhat/tap/easyapply');
+        label.textContent = 'copied ✓';
+        setTimeout(() => (label.textContent = 'copy'), 1600);
+      } catch {}
+    });
+  </script>
+</body>
+</html>
