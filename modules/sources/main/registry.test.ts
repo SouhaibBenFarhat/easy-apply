@@ -3,15 +3,17 @@ import { SOURCE_IDS } from '@sources/shared'
 import { getProvider, listProviderMeta, PROVIDERS } from './index'
 
 describe('provider registry', () => {
-  it('holds the two German anchor providers from PR 6', () => {
-    expect(PROVIDERS).toHaveLength(2)
-    expect(PROVIDERS.map((provider) => provider.meta.id)).toEqual(['ba', 'arbeitnow'])
-    expect(listProviderMeta().map((meta) => meta.id)).toEqual(['ba', 'arbeitnow'])
+  it('holds the PR 6 German anchors plus the PR 7 remote boards', () => {
+    expect(PROVIDERS).toHaveLength(5)
+    const ids = ['ba', 'arbeitnow', 'himalayas', 'remoteok', 'wwr']
+    expect(PROVIDERS.map((provider) => provider.meta.id)).toEqual(ids)
+    expect(listProviderMeta().map((meta) => meta.id)).toEqual(ids)
   })
 
   it('resolves registered ids to their provider', () => {
-    expect(getProvider('ba')?.meta.id).toBe('ba')
-    expect(getProvider('arbeitnow')?.meta.id).toBe('arbeitnow')
+    for (const provider of PROVIDERS) {
+      expect(getProvider(provider.meta.id)?.meta.id).toBe(provider.meta.id)
+    }
   })
 
   it('returns undefined for known source ids that have no provider yet', () => {
