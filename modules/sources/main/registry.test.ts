@@ -3,12 +3,22 @@ import { SOURCE_IDS } from '@sources/shared'
 import { getProvider, listProviderMeta, PROVIDERS } from './index'
 
 describe('provider registry', () => {
-  it('starts empty — providers land in PRs 6–8', () => {
-    expect(PROVIDERS).toEqual([])
-    expect(listProviderMeta()).toEqual([])
+  it('holds the two German anchor providers from PR 6', () => {
+    expect(PROVIDERS).toHaveLength(2)
+    expect(PROVIDERS.map((provider) => provider.meta.id)).toEqual(['ba', 'arbeitnow'])
+    expect(listProviderMeta().map((meta) => meta.id)).toEqual(['ba', 'arbeitnow'])
   })
 
-  it('returns undefined for every known source id while empty', () => {
-    for (const id of SOURCE_IDS) expect(getProvider(id)).toBeUndefined()
+  it('resolves registered ids to their provider', () => {
+    expect(getProvider('ba')?.meta.id).toBe('ba')
+    expect(getProvider('arbeitnow')?.meta.id).toBe('arbeitnow')
+  })
+
+  it('returns undefined for known source ids that have no provider yet', () => {
+    const registered = new Set(PROVIDERS.map((provider) => provider.meta.id))
+    for (const id of SOURCE_IDS) {
+      if (registered.has(id)) continue
+      expect(getProvider(id)).toBeUndefined()
+    }
   })
 })
