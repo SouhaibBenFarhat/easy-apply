@@ -5,8 +5,10 @@ import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 // Path aliases must stay in sync across: this file, tsconfig.node.json,
 // tsconfig.web.json, and vitest.config.ts.
 const nodeAliases = {
-  '@logger': resolve('modules/logger/index.ts'),
+  // '@logger/main' must precede '@logger': object-form aliases match in
+  // insertion order, and the '@logger' prefix would otherwise swallow it.
   '@logger/main': resolve('modules/logger/main.ts'),
+  '@logger': resolve('modules/logger/index.ts'),
   '@sources/shared': resolve('modules/sources/shared/index.ts'),
   '@sources/main': resolve('modules/sources/main/index.ts'),
   '@persistence/main': resolve('modules/persistence/main/index.ts'),

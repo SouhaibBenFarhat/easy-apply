@@ -1,3 +1,4 @@
+import type { IpcRendererEvent } from 'electron'
 import { contextBridge, ipcRenderer } from 'electron'
 
 // The typed bridge surface. Every member is declared in electron-api.d.ts and
@@ -31,6 +32,19 @@ const api = {
     setKey: (sourceId: string, values: Record<string, string>) =>
       ipcRenderer.invoke('sources:set-key', { sourceId, values }),
     clearKey: (sourceId: string) => ipcRenderer.invoke('sources:clear-key', { sourceId }),
+  },
+  sync: {
+    now: () => ipcRenderer.invoke('sync:now'),
+    status: () => ipcRenderer.invoke('sync:status'),
+    // Push events (webContents.send('sync:event', …)) → subscription with an
+    // unsubscribe closure, the house convention for main→renderer pushes.
+    onEvent: (callback: (event: unknown) => void) => {
+      const listener = (_event: IpcRendererEvent, payload: unknown): void => callback(payload)
+      ipcRenderer.on('sync:event', listener)
+      return () => {
+        ipcRenderer.removeListener('sync:event', listener)
+      }
+    },
   },
 }
 

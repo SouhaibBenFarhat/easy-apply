@@ -3,6 +3,13 @@
 
 export { type ClassificationInput, classifyRemoteScope, classifyWorkMode } from './classify'
 export {
+  runSync,
+  type SyncDeps,
+  type SyncEvent,
+  type SyncSummary,
+  summarizeNewJobs,
+} from './engine'
+export {
   HttpError,
   type HttpRequestInit,
   PoliteHttpClient,
