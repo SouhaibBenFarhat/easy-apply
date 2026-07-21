@@ -23,7 +23,7 @@ export const lightTokens = {
   surface: { role: 'neutral', l: 0.958, c: 0.008 },
   'surface-raised': { role: 'neutral', l: 0.944, c: 0.01 },
   'surface-hover': { role: 'neutral', l: 0.93, c: 0.011 },
-  header: { role: 'neutral', l: 0.85, c: 0.012 },
+  header: { role: 'neutral', l: 0.82, c: 0.013 },
   overlay: { role: 'neutral', l: 1.0, c: 0 },
   foreground: { role: 'neutral', l: 0.175, c: 0.015 },
   'foreground-muted': { role: 'neutral', l: 0.47, c: 0.015 },
@@ -62,9 +62,12 @@ export const darkTokens = {
   surface: { role: 'neutral', l: 0.185, c: 0.032 },
   'surface-raised': { role: 'neutral', l: 0.202, c: 0.034 },
   'surface-hover': { role: 'neutral', l: 0.222, c: 0.035 },
-  // One step above surface-raised — a quiet chrome strip, not a glowing slab.
-  header: { role: 'neutral', l: 0.25, c: 0.036 },
-  overlay: { role: 'neutral', l: 0.275, c: 0.033 },
+  // Chrome sits well above the surfaces so there's headroom to elevate
+  // sub-headers with real contrast from the body. Kept high because `.glass`
+  // (header/0.66) reads ~0.06 below the raw token — it must clear surface-hover
+  // (0.222, the sub-header) with room to spare.
+  header: { role: 'neutral', l: 0.35, c: 0.04 },
+  overlay: { role: 'neutral', l: 0.4, c: 0.038 },
   foreground: { role: 'neutral', l: 0.96, c: 0.005 },
   'foreground-muted': { role: 'neutral', l: 0.625, c: 0.015 },
   'foreground-subtle': { role: 'neutral', l: 0.52, c: 0.015 },

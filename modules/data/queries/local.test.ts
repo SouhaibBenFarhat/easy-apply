@@ -44,7 +44,7 @@ describe('readStoredFeedFilters', () => {
       FEED_FILTERS_STORAGE_KEY,
       JSON.stringify({
         workModes: ['remote', 'teleport'],
-        sources: ['ba', 'linkedin'],
+        sources: ['ba', 'not-a-source'],
         hasSalary: 'yes',
         search: 'stale query',
       }),

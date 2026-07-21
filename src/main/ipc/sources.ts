@@ -23,7 +23,9 @@ export interface SourceInfo {
   enabled: boolean
   lastSyncAt: string | null
   hasKey: boolean
-  requiresKey?: { fields: ReadonlyArray<{ id: string; label: string; hint: string }> }
+  requiresKey?: {
+    fields: ReadonlyArray<{ id: string; label: string; hint: string; secret?: boolean }>
+  }
   attribution: { label: string; required: boolean }
 }
 

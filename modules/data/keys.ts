@@ -16,6 +16,15 @@ export interface QueryKeys {
   readonly sync: {
     readonly status: readonly ['sync', 'status']
   }
+  readonly mailbox: {
+    readonly accounts: readonly ['mailbox', 'accounts']
+  }
+  readonly model: {
+    readonly status: readonly ['model', 'status']
+  }
+  readonly agent: {
+    readonly trace: readonly ['agent', 'trace']
+  }
   readonly settings: {
     readonly app: readonly ['settings', 'app']
     readonly theme: readonly ['settings', 'theme']
@@ -37,6 +46,15 @@ export const keys: QueryKeys = {
   },
   sync: {
     status: ['sync', 'status'],
+  },
+  mailbox: {
+    accounts: ['mailbox', 'accounts'],
+  },
+  model: {
+    status: ['model', 'status'],
+  },
+  agent: {
+    trace: ['agent', 'trace'],
   },
   settings: {
     app: ['settings', 'app'],

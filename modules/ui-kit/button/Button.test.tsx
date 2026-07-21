@@ -14,6 +14,12 @@ describe('Button', () => {
     expect(button).toHaveClass('bg-primary', 'text-primary-foreground', 'h-9')
   })
 
+  it('applies secondary variant classes that stay visible on elevated surfaces', () => {
+    render(<Button variant="secondary">Open</Button>)
+    const button = screen.getByRole('button', { name: 'Open' })
+    expect(button).toHaveClass('bg-surface-hover', 'border-border', 'shadow-elevation-low')
+  })
+
   it('applies ghost variant and icon size classes', () => {
     render(
       <Button variant="ghost" size="icon" aria-label="Settings">

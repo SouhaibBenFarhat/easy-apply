@@ -35,7 +35,9 @@ export interface SourceInfo {
   enabled: boolean
   lastSyncAt: string | null
   hasKey: boolean
-  requiresKey?: { fields: ReadonlyArray<{ id: string; label: string; hint: string }> }
+  requiresKey?: {
+    fields: ReadonlyArray<{ id: string; label: string; hint: string; secret?: boolean }>
+  }
   attribution: { label: string; required: boolean }
 }
 
@@ -74,6 +76,42 @@ export interface SyncSummary {
   }>
   startedAt: string
   finishedAt: string
+}
+
+// Mirrors src/main/ipc/mailbox.ts — one connected mail account. Only the
+// address crosses the bridge; the App Password never leaves the main process.
+export interface MailboxAccountInfo {
+  email: string
+}
+
+// Mirrors src/main/model.ts — the local-LLM model state.
+export type ModelState = 'absent' | 'downloading' | 'ready' | 'error'
+
+export interface ModelStatus {
+  state: ModelState
+  modelId: string
+  displayName: string
+  totalBytes: number
+  downloadedBytes: number
+  error: string | null
+  enabled: boolean
+}
+
+// Mirrors src/main/ipc/model.ts — the 'model:progress' push event.
+export interface ModelProgressEvent {
+  downloadedBytes: number
+  totalBytes: number
+  done: boolean
+}
+
+// Mirrors src/main/sync.ts — one line in the agent's live activity trace.
+export interface AgentTraceEvent {
+  seq: number
+  at: string
+  channel: 'sync' | 'mailbox' | 'llm'
+  label: string
+  body?: string
+  chars?: number
 }
 
 // Mirrors modules/persistence/main/repositories/sync-runs.ts.
@@ -129,10 +167,26 @@ export interface ElectronAPI {
     ) => Promise<IpcResult<SourceInfo>>
     readonly clearKey: (sourceId: SourceId) => Promise<IpcResult<SourceInfo>>
   }
+  readonly mailbox: {
+    readonly list: () => Promise<IpcResult<MailboxAccountInfo[]>>
+    readonly add: (email: string, appPassword: string) => Promise<IpcResult<MailboxAccountInfo[]>>
+    readonly remove: (email: string) => Promise<IpcResult<MailboxAccountInfo[]>>
+  }
+  readonly model: {
+    readonly status: () => Promise<IpcResult<ModelStatus>>
+    readonly download: () => Promise<IpcResult<ModelStatus>>
+    readonly cancel: () => Promise<IpcResult<ModelStatus>>
+    readonly remove: () => Promise<IpcResult<ModelStatus>>
+    readonly setEnabled: (enabled: boolean) => Promise<IpcResult<ModelStatus>>
+    readonly onProgress: (callback: (event: ModelProgressEvent) => void) => () => void
+  }
   readonly sync: {
     readonly now: () => Promise<IpcResult<SyncSummary>>
     readonly status: () => Promise<IpcResult<SyncStatus>>
     readonly onEvent: (callback: (event: SyncEvent) => void) => () => void
+  }
+  readonly agent: {
+    readonly onTrace: (callback: (event: AgentTraceEvent) => void) => () => void
   }
 }
 

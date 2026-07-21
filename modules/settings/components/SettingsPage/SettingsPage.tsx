@@ -3,6 +3,7 @@ import { useAppSettings, useSetAppSettings } from '@data'
 import { ScrollArea, useDeferredLoading, useToast } from '@ui-kit'
 import type { ReactElement } from 'react'
 import { AppearanceCard } from './AppearanceCard'
+import { ModelCard } from './ModelCard'
 import { SearchProfileCard } from './SearchProfileCard'
 import { SettingsSkeleton } from './SettingsSkeleton'
 import { SyncCard } from './SyncCard'
@@ -49,6 +50,7 @@ export function SettingsPage(): ReactElement {
               intervalHours={settings.data.syncIntervalHours}
               onChange={(hours) => save({ syncIntervalHours: hours })}
             />
+            <ModelCard />
           </>
         )}
       </div>

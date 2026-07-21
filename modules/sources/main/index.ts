@@ -15,7 +15,35 @@ export {
   PoliteHttpClient,
   type PoliteHttpClientOptions,
 } from './http'
+export {
+  type MailAccount,
+  type MailDriver,
+  type MailMessage,
+  type MailSearchQuery,
+  type ReadAlertOptions,
+  readAlertMessages,
+} from './mail'
+export {
+  buildExtractionPrompt,
+  extractJobsFromEmail,
+  type LlmClient,
+} from './mail-extract'
+export {
+  addAccount,
+  listAccountEmails,
+  type MailboxAccount,
+  parseAccounts,
+  removeAccount,
+  serializeAccounts,
+} from './mailbox-accounts'
 export { buildDedupeKey, cleanText, stripHtml, toIsoOrNull } from './normalize'
 export { decodeProviderConfig, encodeProviderConfig } from './provider-config-codec'
 export { getProvider, listProviderMeta, PROVIDERS } from './registry'
-export type { FetchContext, JobSourceProvider, ProviderMeta, RawPayload } from './types'
+export type {
+  AgentTraceInput,
+  FetchContext,
+  JobSourceProvider,
+  ProviderMeta,
+  RawPayload,
+  TraceFn,
+} from './types'

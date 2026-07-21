@@ -33,6 +33,26 @@ const api = {
       ipcRenderer.invoke('sources:set-key', { sourceId, values }),
     clearKey: (sourceId: string) => ipcRenderer.invoke('sources:clear-key', { sourceId }),
   },
+  mailbox: {
+    list: () => ipcRenderer.invoke('mailbox:list'),
+    add: (email: string, appPassword: string) =>
+      ipcRenderer.invoke('mailbox:add', { email, appPassword }),
+    remove: (email: string) => ipcRenderer.invoke('mailbox:remove', { email }),
+  },
+  model: {
+    status: () => ipcRenderer.invoke('model:status'),
+    download: () => ipcRenderer.invoke('model:download'),
+    cancel: () => ipcRenderer.invoke('model:cancel'),
+    remove: () => ipcRenderer.invoke('model:remove'),
+    setEnabled: (enabled: boolean) => ipcRenderer.invoke('model:set-enabled', enabled),
+    onProgress: (callback: (event: unknown) => void) => {
+      const listener = (_event: IpcRendererEvent, payload: unknown): void => callback(payload)
+      ipcRenderer.on('model:progress', listener)
+      return () => {
+        ipcRenderer.removeListener('model:progress', listener)
+      }
+    },
+  },
   sync: {
     now: () => ipcRenderer.invoke('sync:now'),
     status: () => ipcRenderer.invoke('sync:status'),
@@ -43,6 +63,15 @@ const api = {
       ipcRenderer.on('sync:event', listener)
       return () => {
         ipcRenderer.removeListener('sync:event', listener)
+      }
+    },
+  },
+  agent: {
+    onTrace: (callback: (event: unknown) => void) => {
+      const listener = (_event: IpcRendererEvent, payload: unknown): void => callback(payload)
+      ipcRenderer.on('agent:trace', listener)
+      return () => {
+        ipcRenderer.removeListener('agent:trace', listener)
       }
     },
   },

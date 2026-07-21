@@ -31,6 +31,7 @@ const REGISTRY_ORDER = [
   'RemoteOK',
   'WeWorkRemotely',
   'Adzuna',
+  'Job-alert inbox',
 ] as const
 
 async function listSeededSources(): Promise<SourceInfo[]> {
@@ -65,7 +66,7 @@ describe('SourcesPage', () => {
       'https://www.adzuna.de',
     )
     // Nothing has synced yet in the seeded mock — every meta line says so.
-    expect(screen.getAllByText(/Never synced/)).toHaveLength(6)
+    expect(screen.getAllByText(/Never synced/)).toHaveLength(7)
     expect(screen.getByRole('switch', { name: 'Enable Arbeitsagentur' })).toBeChecked()
     expect(screen.getByRole('switch', { name: 'Enable Adzuna' })).not.toBeChecked()
   })
@@ -82,7 +83,7 @@ describe('SourcesPage', () => {
     render(<Page />)
 
     expect(await screen.findByText(/Synced 1 hour ago/)).toBeInTheDocument()
-    expect(screen.getAllByText(/Never synced/)).toHaveLength(5)
+    expect(screen.getAllByText(/Never synced/)).toHaveLength(6)
   })
 
   it('toggling a switch calls sources.setEnabled', async () => {
@@ -95,14 +96,20 @@ describe('SourcesPage', () => {
     await waitFor(() => expect(setEnabled).toHaveBeenCalledExactlyOnceWith('ba', false))
   })
 
-  it('renders the key form for adzuna only, gates save on all fields, and toasts', async () => {
+  it('renders a key form per keyed source, gates save on all fields, and toasts', async () => {
     const setKey = vi.spyOn(window.electron.sources, 'setKey')
     const user = userEvent.setup()
     render(<Page />)
 
     await screen.findByRole('heading', { level: 3, name: 'Adzuna' })
-    // The only keyed source in the registry: exactly one key form on the page.
-    expect(screen.getAllByRole('button', { name: 'Save key' })).toHaveLength(1)
+    // Adzuna keeps its "Save key" form; the mail inbox is a separate guided
+    // card with an "Add account" button and a link to Google App Passwords.
+    expect(screen.getByRole('button', { name: 'Save key' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add account' })).toBeInTheDocument()
+    // The inbox's App Passwords link routes through Google's account chooser.
+    expect(
+      screen.getByRole('link', { name: 'Open Google App Passwords' }).getAttribute('href'),
+    ).toContain('accounts.google.com/AccountChooser')
     expect(
       screen.getByText(
         'Free key from developer.adzuna.com — the only Munich source with salary data.',
@@ -125,9 +132,9 @@ describe('SourcesPage', () => {
     )
     expect(await screen.findByText('Key saved — Adzuna enabled')).toBeInTheDocument()
     // setKey enables the source and stores the key; the refetched card
-    // collapses the form into the configured row.
+    // collapses Adzuna's form into the configured row.
     expect(await screen.findByText('API key configured')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Save key' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Application ID')).not.toBeInTheDocument()
     expect(screen.getByRole('switch', { name: 'Enable Adzuna' })).toBeChecked()
   })
 
@@ -185,13 +192,16 @@ describe('SourcesPage', () => {
     const user = userEvent.setup()
     render(<Page />)
 
+    // Only Adzuna has a key here, so Replace key is unique to its card; scope
+    // the form-toggle assertions to Adzuna's unique field (the mailbox card
+    // always shows its own Save key form).
     const replace = await screen.findByRole('button', { name: 'Replace key' })
-    expect(screen.queryByRole('button', { name: 'Save key' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Application ID')).not.toBeInTheDocument()
     await user.click(replace)
-    expect(screen.getByRole('button', { name: 'Save key' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Application ID')).toBeInTheDocument()
     expect(screen.getByText('API key configured')).toBeInTheDocument()
     await user.click(replace)
-    expect(screen.queryByRole('button', { name: 'Save key' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Application ID')).not.toBeInTheDocument()
   })
 
   // Newest-first, like listRecentSyncRuns: ba's latest run failed (long

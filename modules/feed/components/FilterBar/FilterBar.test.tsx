@@ -1,6 +1,6 @@
 import type { SourceInfo } from '@data'
 import type { FeedFilters } from '@sources/shared'
-import { act, fireEvent, render, screen, userEvent, waitFor } from '@test-utils'
+import { render, screen, userEvent } from '@test-utils'
 import { FilterBar } from './FilterBar'
 
 function makeSource(
@@ -52,89 +52,39 @@ describe('FilterBar', () => {
     expect(onChange).toHaveBeenCalledWith({ workModes: undefined })
   })
 
-  // The two debounce tests drive the input with synchronous fireEvent.change:
-  // user-event's delay loop deadlocks against vitest fake timers under
-  // happy-dom, and the unit under test is our debounce, not typing mechanics.
-  it('debounces search input by 250ms', () => {
-    vi.useFakeTimers()
-    try {
-      const onChange = vi.fn()
-      renderBar({}, onChange)
-
-      const input = screen.getByRole('searchbox', { name: 'Search jobs' })
-      fireEvent.change(input, { target: { value: 'rea' } })
-      act(() => {
-        vi.advanceTimersByTime(200)
-      })
-      // A keystroke inside the window restarts the timer.
-      fireEvent.change(input, { target: { value: 'react' } })
-      act(() => {
-        vi.advanceTimersByTime(249)
-      })
-      expect(onChange).not.toHaveBeenCalled()
-
-      act(() => {
-        vi.advanceTimersByTime(1)
-      })
-      expect(onChange).toHaveBeenCalledExactlyOnceWith({ search: 'react' })
-    } finally {
-      vi.useRealTimers()
-    }
+  it('has no search field', () => {
+    renderBar()
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
   })
 
-  it('emits undefined when the search is cleared back to whitespace', () => {
-    vi.useFakeTimers()
-    try {
-      const onChange = vi.fn()
-      renderBar({ search: 'react' }, onChange)
-
-      const input = screen.getByRole('searchbox', { name: 'Search jobs' })
-      expect(input).toHaveValue('react')
-      fireEvent.change(input, { target: { value: '   ' } })
-      act(() => {
-        vi.advanceTimersByTime(250)
-      })
-      expect(onChange).toHaveBeenCalledExactlyOnceWith({ search: undefined })
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it('adopts an external reset without emitting it back', async () => {
+  it('toggles the salary switch inside the filters popover', async () => {
     const onChange = vi.fn()
-    const { rerender } = render(
-      <FilterBar filters={{ search: 'react' }} sources={SOURCES} onChange={onChange} />,
-    )
-    rerender(<FilterBar filters={{}} sources={SOURCES} onChange={onChange} />)
-
-    expect(screen.getByRole('searchbox', { name: 'Search jobs' })).toHaveValue('')
-    await waitFor(() => expect(onChange).not.toHaveBeenCalled())
-  })
-
-  it('toggles the salary switch into hasSalary', async () => {
-    const onChange = vi.fn()
+    const user = userEvent.setup()
     renderBar({}, onChange)
 
-    await userEvent.setup().click(screen.getByRole('switch', { name: 'Salary' }))
+    await user.click(screen.getByRole('button', { name: 'Filters' }))
+    await user.click(await screen.findByRole('switch', { name: 'Has salary' }))
     expect(onChange).toHaveBeenCalledExactlyOnceWith({ hasSalary: true })
   })
 
   it('clears hasSalary when switched back off', async () => {
     const onChange = vi.fn()
+    const user = userEvent.setup()
     renderBar({ hasSalary: true }, onChange)
 
-    const toggle = screen.getByRole('switch', { name: 'Salary' })
+    await user.click(screen.getByRole('button', { name: 'Filters' }))
+    const toggle = await screen.findByRole('switch', { name: 'Has salary' })
     expect(toggle).toBeChecked()
-    await userEvent.setup().click(toggle)
+    await user.click(toggle)
     expect(onChange).toHaveBeenCalledExactlyOnceWith({ hasSalary: undefined })
   })
 
-  it('narrows sources from the popover', async () => {
+  it('narrows sources from the filters popover', async () => {
     const onChange = vi.fn()
     const user = userEvent.setup()
     renderBar({}, onChange)
 
-    await user.click(screen.getByRole('button', { name: 'Sources' }))
+    await user.click(screen.getByRole('button', { name: 'Filters' }))
     const remoteOk = await screen.findByRole('switch', { name: 'RemoteOK' })
     expect(remoteOk).toBeChecked()
     await user.click(remoteOk)
@@ -146,8 +96,7 @@ describe('FilterBar', () => {
     const user = userEvent.setup()
     renderBar({ sources: ['ba', 'arbeitnow'] }, onChange)
 
-    // The trigger badge shows the active count while filtered.
-    await user.click(screen.getByRole('button', { name: /Sources 2/ }))
+    await user.click(screen.getByRole('button', { name: 'Filters' }))
     const remoteOk = await screen.findByRole('switch', { name: 'RemoteOK' })
     expect(remoteOk).not.toBeChecked()
     await user.click(remoteOk)
@@ -159,7 +108,7 @@ describe('FilterBar', () => {
     const user = userEvent.setup()
     renderBar({ sources: ['ba'] }, onChange)
 
-    await user.click(screen.getByRole('button', { name: /Sources 1/ }))
+    await user.click(screen.getByRole('button', { name: 'Filters' }))
     await user.click(await screen.findByRole('menuitem', { name: 'All sources' }))
     expect(onChange).toHaveBeenCalledExactlyOnceWith({ sources: undefined })
   })

@@ -1,6 +1,6 @@
 // L0 — shared logging surface (renderer-safe). No imports from app modules.
 
-export type LogCategory = 'app' | 'data' | 'sync' | 'source' | 'db' | 'ipc' | 'ui'
+export type LogCategory = 'app' | 'data' | 'sync' | 'source' | 'db' | 'ipc' | 'ui' | 'llm'
 
 export interface Logger {
   readonly debug: (message: string, meta?: Record<string, unknown>) => void

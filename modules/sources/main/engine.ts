@@ -9,7 +9,9 @@ import {
 } from '@persistence/main'
 import type { SearchProfile, SourceId } from '@sources/shared'
 import type { PoliteHttpClient } from './http'
-import type { FetchContext, JobSourceProvider, ProviderMeta } from './types'
+import type { MailAccount, MailDriver } from './mail'
+import type { LlmClient } from './mail-extract'
+import type { FetchContext, JobSourceProvider, ProviderMeta, TraceFn } from './types'
 
 // The sequential, politeness-respecting sync engine (PLAN.md §4.6). Pure and
 // dependency-injected — no electron imports — so vitest drives it against an
@@ -59,6 +61,12 @@ export interface SyncDeps {
   logger: Logger
   emit?: (event: SyncEvent) => void
   now?: () => Date
+  // Email-ingestion runtime, passed to the mailbox provider's ctx. Optional:
+  // when the on-device model isn't installed, these are undefined and the
+  // mailbox source skips.
+  createMail?: (account: MailAccount) => MailDriver
+  llm?: LlmClient
+  trace?: TraceFn
 }
 
 export async function runSync(
@@ -118,6 +126,9 @@ export async function runSync(
         config: await deps.readConfig(meta.id),
         searchProfile,
         logger,
+        createMail: deps.createMail,
+        llm: deps.llm,
+        trace: deps.trace,
       }
       const payloads = await provider.fetch(ctx)
       const jobs = payloads.flatMap((payload) => provider.parse(payload, ctx))

@@ -1,13 +1,17 @@
 import type { ThemeVariant } from '@data'
-import { useSetTheme, useTheme } from '@data'
+import { useAgentTraceCollector, useSetTheme, useTheme } from '@data'
 import type { SidebarNavItem } from '@shell'
 import { AppHeader, Sidebar } from '@shell'
 import { Outlet, useRouter, useRouterState } from '@tanstack/react-router'
 import { Toaster, TooltipProvider } from '@ui-kit'
 import { ClipboardList, Plug, Rss, Settings } from 'lucide-react'
-import type { ReactElement } from 'react'
+import { type ReactElement, useState } from 'react'
+import { AgentMonitorButton } from './AgentMonitorButton'
+import { AgentTimeline } from './AgentTimeline'
+import { AiToggle } from './AiToggle'
 import { useSyncControls } from './hooks/use-sync-controls'
 import { useAppKeyboard } from './keyboard'
+import { ModelBanner } from './ModelBanner'
 
 const NAV_ITEMS: SidebarNavItem[] = [
   { to: '/feed', label: 'Feed', icon: <Rss /> },
@@ -31,6 +35,8 @@ export function RootLayout(): ReactElement {
   const theme = useTheme().data ?? 'dark'
   const setTheme = useSetTheme()
   const { syncing, onSyncNow } = useSyncControls()
+  const [monitorOpen, setMonitorOpen] = useState(false)
+  useAgentTraceCollector() // stream agent:trace events into the cache
   useAppKeyboard(router)
 
   return (
@@ -50,9 +56,20 @@ export function RootLayout(): ReactElement {
             onSyncNow={onSyncNow}
             theme={theme}
             onCycleTheme={() => setTheme.mutate(NEXT_THEME[theme])}
-          />
-          <div className="min-h-0 flex-1">
-            <Outlet />
+          >
+            <AiToggle />
+            <AgentMonitorButton
+              open={monitorOpen}
+              onToggle={() => setMonitorOpen((open) => !open)}
+            />
+          </AppHeader>
+          <ModelBanner onOpen={() => void router.navigate({ to: '/settings' })} />
+          {/* The activity panel pushes the content (not an overlay). */}
+          <div className="flex min-h-0 flex-1">
+            <div className="min-w-0 flex-1">
+              <Outlet />
+            </div>
+            {monitorOpen ? <AgentTimeline onClose={() => setMonitorOpen(false)} /> : null}
           </div>
         </main>
       </div>

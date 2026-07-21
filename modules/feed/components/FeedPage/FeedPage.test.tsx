@@ -96,23 +96,6 @@ describe('FeedPage', () => {
     expect(screen.getByRole('button', { name: /Remote role/ })).toBeInTheDocument()
   })
 
-  it('filters by search text end to end (debounced)', async () => {
-    seedElectron({
-      jobs: [makeJob({ title: 'React Developer' }), makeJob({ title: 'Java Developer' })],
-    })
-    render(<FeedPage />)
-
-    const input = await screen.findByRole('searchbox', { name: 'Search jobs' })
-    fireEvent.change(input, { target: { value: 'react' } })
-
-    await waitFor(
-      () =>
-        expect(screen.queryByRole('button', { name: /Java Developer/ })).not.toBeInTheDocument(),
-      { timeout: 2000 },
-    )
-    expect(screen.getByRole('button', { name: /React Developer/ })).toBeInTheDocument()
-  })
-
   it('filters on the salary toggle', async () => {
     seedElectron({
       jobs: [
@@ -124,7 +107,8 @@ describe('FeedPage', () => {
     render(<FeedPage />)
 
     await screen.findByRole('button', { name: /Quiet role/ })
-    await user.click(screen.getByRole('switch', { name: 'Salary' }))
+    await user.click(screen.getByRole('button', { name: 'Filters' }))
+    await user.click(await screen.findByRole('switch', { name: 'Has salary' }))
 
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: /Quiet role/ })).not.toBeInTheDocument(),

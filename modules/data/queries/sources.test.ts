@@ -8,7 +8,8 @@ describe('useSources', () => {
     const ids = result.current.data?.map((info) => info.sourceId)
     expect(ids).toContain('ba')
     expect(ids).toContain('adzuna')
-    expect(result.current.data?.length).toBe(6)
+    expect(ids).toContain('mailbox')
+    expect(result.current.data?.length).toBe(7)
   })
 
   it('surfaces an IpcResult failure as a query error', async () => {
