@@ -181,6 +181,16 @@
     }
   }
 
+  /* Electron window-drag regions: header/spacer chrome drags the window
+     (hiddenInset traffic lights); interactive clusters inside opt back out. */
+  .app-drag {
+    -webkit-app-region: drag;
+  }
+
+  .app-no-drag {
+    -webkit-app-region: no-drag;
+  }
+
   /* Micro-caps metadata label (company · location · posted · source). */
   .label-caps {
     font-size: 0.7rem;
