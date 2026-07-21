@@ -24,6 +24,21 @@ export interface ProviderState {
   configJson: string | null
 }
 
+// Mirrors src/main/ipc/sources.ts — the exact 'sources:list' row shape.
+// hasKey is deliberately a boolean: decrypted key material never crosses the
+// bridge back to the renderer.
+export interface SourceInfo {
+  sourceId: SourceId
+  displayName: string
+  homepage: string
+  enabledByDefault: boolean
+  enabled: boolean
+  lastSyncAt: string | null
+  hasKey: boolean
+  requiresKey?: { fields: ReadonlyArray<{ id: string; label: string; hint: string }> }
+  attribution: { label: string; required: boolean }
+}
+
 export interface ElectronAPI {
   readonly platform: NodeJS.Platform
   readonly settings: {
@@ -48,6 +63,15 @@ export interface ElectronAPI {
         enabled: boolean,
       ) => Promise<IpcResult<ProviderState>>
     }
+  }
+  readonly sources: {
+    readonly list: () => Promise<IpcResult<SourceInfo[]>>
+    readonly setEnabled: (sourceId: SourceId, enabled: boolean) => Promise<IpcResult<SourceInfo>>
+    readonly setKey: (
+      sourceId: SourceId,
+      values: Record<string, string>,
+    ) => Promise<IpcResult<SourceInfo>>
+    readonly clearKey: (sourceId: SourceId) => Promise<IpcResult<SourceInfo>>
   }
 }
 

@@ -3,9 +3,9 @@ import { SOURCE_IDS } from '@sources/shared'
 import { getProvider, listProviderMeta, PROVIDERS } from './index'
 
 describe('provider registry', () => {
-  it('holds the PR 6 German anchors plus the PR 7 remote boards', () => {
-    expect(PROVIDERS).toHaveLength(5)
-    const ids = ['ba', 'arbeitnow', 'himalayas', 'remoteok', 'wwr']
+  it('holds the German anchors, the remote boards, and keyed Adzuna', () => {
+    expect(PROVIDERS).toHaveLength(6)
+    const ids = ['ba', 'arbeitnow', 'himalayas', 'remoteok', 'wwr', 'adzuna']
     expect(PROVIDERS.map((provider) => provider.meta.id)).toEqual(ids)
     expect(listProviderMeta().map((meta) => meta.id)).toEqual(ids)
   })
