@@ -3,6 +3,7 @@ import { Badge, Button } from '@ui-kit'
 import type { ReactElement } from 'react'
 import { useEffect, useState } from 'react'
 import { KeyForm } from './KeyForm'
+import { MailboxGuide } from './MailboxGuide'
 
 export interface KeySectionProps {
   source: SourceInfo
@@ -56,9 +57,11 @@ export function KeySection({ source, onSaveKey, onClearKey }: KeySectionProps): 
       ) : null}
       {!source.hasKey || replacing ? (
         <>
+          {source.sourceId === 'mailbox' ? <MailboxGuide /> : null}
           <KeyForm
             sourceId={source.sourceId}
             fields={source.requiresKey?.fields ?? []}
+            saveLabel={source.sourceId === 'mailbox' ? 'Connect' : 'Save key'}
             onSave={(values) => {
               // Collapse the replacement form immediately; the sources query
               // invalidation confirms the new key state.

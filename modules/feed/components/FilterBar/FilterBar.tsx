@@ -1,9 +1,7 @@
 import type { SourceInfo } from '@data'
 import type { FeedFilters, SourceId, WorkMode } from '@sources/shared'
 import {
-  Badge,
   Button,
-  Input,
   Label,
   ListMenu,
   ListMenuItem,
@@ -16,16 +14,14 @@ import {
   TabsList,
   TabsTrigger,
 } from '@ui-kit'
+import { Settings2 } from 'lucide-react'
 import type { ReactElement } from 'react'
-import { useEffect, useRef, useState } from 'react'
 
 export interface FilterBarProps {
   filters: FeedFilters
   sources: SourceInfo[]
   onChange: (filters: FeedFilters) => void
 }
-
-const SEARCH_DEBOUNCE_MS = 250
 
 type WorkModeTab = 'all' | 'onsite' | 'hybrid' | 'remote'
 
@@ -43,36 +39,6 @@ function workModeTab(workModes: WorkMode[] | undefined): WorkModeTab {
 }
 
 export function FilterBar({ filters, sources, onChange }: FilterBarProps): ReactElement {
-  const propSearch = filters.search ?? ''
-  const [search, setSearch] = useState(propSearch)
-
-  // Debounce plumbing: refs keep the effect's deps down to the typed text, so
-  // the timer restarts on keystrokes only — not on unrelated filter changes.
-  const filtersRef = useRef(filters)
-  filtersRef.current = filters
-  const onChangeRef = useRef(onChange)
-  onChangeRef.current = onChange
-
-  // Adopt external search changes (reset-filters) without fighting the user:
-  // only overwrite the draft when the prop moved to something we didn't emit.
-  const lastEmitted = useRef(propSearch)
-  useEffect(() => {
-    if (propSearch !== lastEmitted.current) {
-      lastEmitted.current = propSearch
-      setSearch(propSearch)
-    }
-  }, [propSearch])
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const next = search.trim() === '' ? undefined : search
-      if ((next ?? '') === (filtersRef.current.search ?? '')) return
-      lastEmitted.current = next ?? ''
-      onChangeRef.current({ ...filtersRef.current, search: next })
-    }, SEARCH_DEBOUNCE_MS)
-    return () => clearTimeout(timer)
-  }, [search])
-
   const activeSources = filters.sources ?? sources.map((info) => info.sourceId)
   const toggleSource = (sourceId: SourceId): void => {
     const next = activeSources.includes(sourceId)
@@ -81,11 +47,12 @@ export function FilterBar({ filters, sources, onChange }: FilterBarProps): React
     // Selecting every source is the same as not filtering at all.
     onChange({ ...filters, sources: next.length === sources.length ? undefined : next })
   }
+  const filtersActive = filters.hasSalary === true || filters.sources !== undefined
 
   return (
-    // Solid ladder step (surface), not glass — stacked glass panels read as
-    // glowing slabs; only the app header carries the material (§5.3).
-    <div className="sticky top-0 z-10 flex shrink-0 flex-col gap-2 border-b border-border-subtle bg-surface p-2">
+    // The job-list sidebar's header (§sidebars): work-mode tabs + a gear that
+    // opens the salary / source controls. `surface-hover` chrome + full border.
+    <div className="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b border-border bg-surface-hover p-2">
       <Tabs
         value={workModeTab(filters.workModes)}
         onValueChange={(value) => {
@@ -94,6 +61,7 @@ export function FilterBar({ filters, sources, onChange }: FilterBarProps): React
             workModes: value === 'all' ? undefined : [value as WorkMode],
           })
         }}
+        className="min-w-0 flex-1"
       >
         <TabsList aria-label="Work mode" className="w-full">
           {WORK_MODE_TABS.map((tab) => (
@@ -103,67 +71,58 @@ export function FilterBar({ filters, sources, onChange }: FilterBarProps): React
           ))}
         </TabsList>
       </Tabs>
-      <div className="flex items-center gap-3">
-        <Input
-          type="search"
-          placeholder="Search title or company…"
-          aria-label="Search jobs"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          className="h-8 min-w-0 flex-1"
-        />
-        <span className="flex shrink-0 items-center gap-1.5">
-          <Switch
-            id="filter-has-salary"
-            checked={filters.hasSalary === true}
-            onCheckedChange={(checked) => {
-              onChange({ ...filters, hasSalary: checked ? true : undefined })
-            }}
-          />
-          <Label htmlFor="filter-has-salary" className="text-xs text-foreground-muted">
-            Salary
-          </Label>
-        </span>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="shrink-0">
-              Sources
-              {filters.sources !== undefined ? (
-                <Badge variant="copper">{filters.sources.length}</Badge>
-              ) : null}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-64 p-2">
-            <ListMenu aria-label="Sources">
-              {sources.map((info) => (
-                <span
-                  key={info.sourceId}
-                  className="flex items-center justify-between gap-3 rounded-sm px-3 py-2"
-                >
-                  <Label
-                    htmlFor={`filter-source-${info.sourceId}`}
-                    className="min-w-0 flex-1 truncate text-sm"
-                  >
-                    {info.displayName}
-                  </Label>
-                  <Switch
-                    id={`filter-source-${info.sourceId}`}
-                    checked={activeSources.includes(info.sourceId)}
-                    onCheckedChange={() => toggleSource(info.sourceId)}
-                  />
-                </span>
-              ))}
-              <ListMenuSeparator />
-              <ListMenuItem
-                disabled={filters.sources === undefined}
-                onClick={() => onChange({ ...filters, sources: undefined })}
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="icon" aria-label="Filters" className="relative shrink-0">
+            <Settings2 />
+            {filtersActive ? (
+              <span className="absolute right-1 top-1 size-1.5 rounded-full bg-info" aria-hidden />
+            ) : null}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-64 space-y-2 p-2">
+          <div className="flex items-center justify-between gap-3 px-1 py-1">
+            <Label htmlFor="filter-has-salary" className="text-sm">
+              Has salary
+            </Label>
+            <Switch
+              id="filter-has-salary"
+              checked={filters.hasSalary === true}
+              onCheckedChange={(checked) => {
+                onChange({ ...filters, hasSalary: checked ? true : undefined })
+              }}
+            />
+          </div>
+          <ListMenuSeparator />
+          <ListMenu aria-label="Sources">
+            {sources.map((info) => (
+              <span
+                key={info.sourceId}
+                className="flex items-center justify-between gap-3 rounded-sm px-3 py-2"
               >
-                All sources
-              </ListMenuItem>
-            </ListMenu>
-          </PopoverContent>
-        </Popover>
-      </div>
+                <Label
+                  htmlFor={`filter-source-${info.sourceId}`}
+                  className="min-w-0 flex-1 truncate text-sm"
+                >
+                  {info.displayName}
+                </Label>
+                <Switch
+                  id={`filter-source-${info.sourceId}`}
+                  checked={activeSources.includes(info.sourceId)}
+                  onCheckedChange={() => toggleSource(info.sourceId)}
+                />
+              </span>
+            ))}
+            <ListMenuSeparator />
+            <ListMenuItem
+              disabled={filters.sources === undefined}
+              onClick={() => onChange({ ...filters, sources: undefined })}
+            >
+              All sources
+            </ListMenuItem>
+          </ListMenu>
+        </PopoverContent>
+      </Popover>
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { adzunaProvider } from './providers/adzuna'
 import { arbeitnowProvider } from './providers/arbeitnow'
 import { baProvider } from './providers/ba'
 import { himalayasProvider } from './providers/himalayas'
+import { mailboxProvider } from './providers/mailbox'
 import { remoteokProvider } from './providers/remoteok'
 import { wwrProvider } from './providers/wwr'
 import type { JobSourceProvider, ProviderMeta } from './types'
@@ -18,6 +19,7 @@ export const PROVIDERS: readonly JobSourceProvider[] = [
   remoteokProvider,
   wwrProvider,
   adzunaProvider,
+  mailboxProvider,
 ]
 
 export function getProvider(id: SourceId): JobSourceProvider | undefined {

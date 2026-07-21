@@ -7,7 +7,10 @@ export interface ScrollAreaProps extends ComponentProps<typeof Root> {}
 export function ScrollArea({ className, children, ...props }: ScrollAreaProps): ReactElement {
   return (
     <Root className={cn('relative overflow-hidden', className)} {...props}>
-      <Viewport className="h-full w-full rounded-[inherit]">{children}</Viewport>
+      {/* Radix wraps children in a display:table div sized to max-content, which
+          breaks `truncate` on descendants (they overflow instead of ellipsing).
+          Force it to block so children are constrained to the viewport width. */}
+      <Viewport className="h-full w-full rounded-[inherit] [&>div]:!block">{children}</Viewport>
       <ScrollBar />
       <Corner />
     </Root>

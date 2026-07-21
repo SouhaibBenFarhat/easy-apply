@@ -17,7 +17,12 @@ export type {
   WorkMode,
 } from '@sources/shared'
 export type {
+  AgentTraceEvent,
   AppSettings,
+  MailboxAccountInfo,
+  ModelProgressEvent,
+  ModelState,
+  ModelStatus,
   ProviderState,
   SourceInfo,
   SyncEvent,
@@ -31,6 +36,8 @@ export {
   setupPersistence,
   shouldDehydrateQuery,
 } from './client'
+export { useAgentTrace, useAgentTraceCollector } from './hooks/use-agent-trace'
+export { useModelProgress } from './hooks/use-model-progress'
 export { useSyncEventInvalidation, useSyncEvents } from './hooks/use-sync-events'
 export { unwrap } from './ipc'
 export { keys, type QueryKeys } from './keys'
@@ -43,6 +50,17 @@ export {
   useSetJobStatus,
 } from './mutations/jobs'
 export { useMarkFeedVisited, useSetStoredFeedFilters } from './mutations/local'
+export {
+  type AddMailboxAccountVariables,
+  useAddMailboxAccount,
+  useRemoveMailboxAccount,
+} from './mutations/mailbox'
+export {
+  useCancelModelDownload,
+  useDownloadModel,
+  useRemoveModel,
+  useSetModelEnabled,
+} from './mutations/model'
 export { useSetAppSettings } from './mutations/settings'
 export {
   type ClearSourceKeyVariables,
@@ -62,6 +80,8 @@ export {
   useLastFeedVisit,
   useStoredFeedFilters,
 } from './queries/local'
+export { useMailboxAccounts } from './queries/mailbox'
+export { useModelStatus } from './queries/model'
 export { useAppSettings } from './queries/settings'
 export { useSources } from './queries/sources'
 export { useSyncStatus } from './queries/sync'

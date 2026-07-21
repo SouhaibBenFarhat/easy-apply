@@ -16,6 +16,16 @@ export type SourceId =
   | 'jooble'
   | 'landingjobs'
   | 'themuse'
+  // Email-alert ingestion: jobs parsed from the user's own job-alert inbox
+  // over IMAP. `mailbox` is the single credentialed mail connection (the
+  // Sources card that holds the Gmail address + App Password); the jobs it
+  // emits are tagged with their board's id below so the feed chip, per-source
+  // toggle, and cross-source dedupe all work naturally.
+  | 'mailbox'
+  | 'linkedin'
+  | 'indeed'
+  | 'stepstone'
+  | 'xing'
 
 export const SOURCE_IDS: readonly SourceId[] = [
   'ba',
@@ -28,6 +38,11 @@ export const SOURCE_IDS: readonly SourceId[] = [
   'jooble',
   'landingjobs',
   'themuse',
+  'mailbox',
+  'linkedin',
+  'indeed',
+  'stepstone',
+  'xing',
 ]
 
 export type WorkMode = 'onsite' | 'hybrid' | 'remote' | 'unknown'

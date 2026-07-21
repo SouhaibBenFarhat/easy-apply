@@ -3,7 +3,7 @@ import { cva } from 'class-variance-authority'
 import type { ComponentProps, ReactElement } from 'react'
 import { cn } from '../utils'
 
-export type ButtonVariant = 'default' | 'ghost' | 'outline' | 'destructive'
+export type ButtonVariant = 'default' | 'secondary' | 'ghost' | 'outline' | 'destructive'
 export type ButtonSize = 'default' | 'sm' | 'lg' | 'icon' | 'icon-sm'
 
 const buttonVariants = cva(
@@ -12,6 +12,12 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-elevation-low',
+        // Neutral filled control that stays visible on ELEVATED surfaces
+        // (cards): a lifted fill + full-strength border + shadow, so it never
+        // merges into the surface behind it the way ghost/outline do. Use this
+        // for secondary actions on cards/panels. See the visual-hierarchy skill.
+        secondary:
+          'border border-border bg-surface-hover text-foreground shadow-elevation-low hover:bg-interactive-active',
         ghost: 'hover:bg-interactive-hover rounded-sm',
         outline: 'border border-border bg-transparent hover:bg-interactive-hover',
         destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',

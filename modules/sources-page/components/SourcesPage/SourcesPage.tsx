@@ -1,6 +1,9 @@
 import type { SourceId, SourceInfo, SyncRun } from '@data'
 import {
+  useAddMailboxAccount,
   useClearSourceKey,
+  useMailboxAccounts,
+  useRemoveMailboxAccount,
   useSetSourceEnabled,
   useSetSourceKey,
   useSources,
@@ -10,6 +13,7 @@ import { Button, EmptyState, ScrollArea, useDeferredLoading, useToast } from '@u
 import { Unplug } from 'lucide-react'
 import type { ReactElement } from 'react'
 import { useMemo } from 'react'
+import { MailboxCard } from '../MailboxCard'
 import { SourceCard } from '../SourceCard'
 import { SourcesSkeleton } from './SourcesSkeleton'
 
@@ -21,6 +25,9 @@ export function SourcesPage(): ReactElement {
   const setEnabled = useSetSourceEnabled()
   const setKey = useSetSourceKey()
   const clearKey = useClearSourceKey()
+  const mailboxAccounts = useMailboxAccounts()
+  const addMailboxAccount = useAddMailboxAccount()
+  const removeMailboxAccount = useRemoveMailboxAccount()
   const { toast } = useToast()
   const loading = useDeferredLoading(sources.isPending)
 
@@ -48,6 +55,34 @@ export function SourcesPage(): ReactElement {
         },
       },
     )
+  }
+
+  const addAccount = (values: Record<string, string>): void => {
+    addMailboxAccount.mutate(
+      { email: values.email ?? '', appPassword: values.app_password ?? '' },
+      {
+        onSuccess: () => toast({ title: 'Inbox connected' }),
+        onError: (error) => {
+          toast({
+            title: 'Could not connect inbox',
+            description: error.message,
+            variant: 'destructive',
+          })
+        },
+      },
+    )
+  }
+
+  const removeAccount = (email: string): void => {
+    removeMailboxAccount.mutate(email, {
+      onError: (error) => {
+        toast({
+          title: 'Could not remove inbox',
+          description: error.message,
+          variant: 'destructive',
+        })
+      },
+    })
   }
 
   if (sources.isError) {
@@ -81,16 +116,27 @@ export function SourcesPage(): ReactElement {
             <p className="text-sm text-foreground-muted">
               Sources sync sequentially and respect each provider's rate limits.
             </p>
-            {sources.data.map((source) => (
-              <SourceCard
-                key={source.sourceId}
-                source={source}
-                lastRun={lastRuns.get(source.sourceId) ?? null}
-                onToggle={(enabled) => setEnabled.mutate({ sourceId: source.sourceId, enabled })}
-                onSaveKey={(values) => saveKey(source, values)}
-                onClearKey={() => clearKey.mutate({ sourceId: source.sourceId })}
-              />
-            ))}
+            {sources.data.map((source) =>
+              source.sourceId === 'mailbox' ? (
+                <MailboxCard
+                  key={source.sourceId}
+                  source={source}
+                  accounts={mailboxAccounts.data ?? []}
+                  onToggle={(enabled) => setEnabled.mutate({ sourceId: source.sourceId, enabled })}
+                  onAddAccount={addAccount}
+                  onRemoveAccount={removeAccount}
+                />
+              ) : (
+                <SourceCard
+                  key={source.sourceId}
+                  source={source}
+                  lastRun={lastRuns.get(source.sourceId) ?? null}
+                  onToggle={(enabled) => setEnabled.mutate({ sourceId: source.sourceId, enabled })}
+                  onSaveKey={(values) => saveKey(source, values)}
+                  onClearKey={() => clearKey.mutate({ sourceId: source.sourceId })}
+                />
+              ),
+            )}
           </>
         )}
       </div>

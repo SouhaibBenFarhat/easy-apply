@@ -14,7 +14,7 @@
     "pnpm": ">=10"
   },
   "scripts": {
-    "dev": "electron-vite dev",
+    "dev": "electron-vite dev --watch",
     "build": "npm run generate:theme && electron-vite build",
     "typecheck": "tsc -p tsconfig.web.json --emitDeclarationOnly --outDir .typecheck-temp && tsc --noEmit -p tsconfig.node.json && rm -rf .typecheck-temp",
     "lint": "biome check .",
@@ -38,7 +38,9 @@
     ],
     "asar": true,
     "asarUnpack": [
-      "node_modules/@electric-sql/pglite/**"
+      "node_modules/@electric-sql/pglite/**",
+      "node_modules/node-llama-cpp/**",
+      "node_modules/@node-llama-cpp/**"
     ],
     "extraResources": [
       {
@@ -92,7 +94,10 @@
     "dompurify": "^3.4.12",
     "drizzle-orm": "^0.45.2",
     "electron-store": "^11.0.2",
+    "imapflow": "^1.4.8",
     "lucide-react": "^1.25.0",
+    "mailparser": "^3.9.14",
+    "node-llama-cpp": "^3.19.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "tailwind-merge": "^3.6.0",
@@ -105,6 +110,7 @@
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
+    "@types/mailparser": "^3.4.6",
     "@types/node": "^22.10.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
@@ -126,7 +132,8 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "electron",
-      "esbuild"
+      "esbuild",
+      "node-llama-cpp"
     ]
   }
 }

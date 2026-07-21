@@ -7,12 +7,20 @@ export interface KeyFormProps {
   sourceId: string
   fields: NonNullable<SourceInfo['requiresKey']>['fields']
   onSave: (values: Record<string, string>) => void
+  /** Submit-button label — defaults to "Save key". */
+  saveLabel?: string
 }
 
-// Credential entry for a keyed source: one password input per declared field.
-// Values only ever travel outward through onSave — nothing is echoed back
-// from the main process (SourceInfo deliberately carries hasKey, not the key).
-export function KeyForm({ sourceId, fields, onSave }: KeyFormProps): ReactElement {
+// Credential entry for a keyed source: one input per declared field, masked
+// unless the field is explicitly non-secret (secret === false, e.g. an email
+// address). Values only ever travel outward through onSave — nothing is echoed
+// back from the main process (SourceInfo carries hasKey, not the key).
+export function KeyForm({
+  sourceId,
+  fields,
+  onSave,
+  saveLabel = 'Save key',
+}: KeyFormProps): ReactElement {
   const [values, setValues] = useState<Record<string, string>>({})
   const complete = fields.every((field) => (values[field.id] ?? '').trim() !== '')
 
@@ -25,7 +33,7 @@ export function KeyForm({ sourceId, fields, onSave }: KeyFormProps): ReactElemen
             <Label htmlFor={inputId}>{field.label}</Label>
             <Input
               id={inputId}
-              type="password"
+              type={field.secret === false ? 'text' : 'password'}
               placeholder={field.hint}
               value={values[field.id] ?? ''}
               onChange={(event) =>
@@ -36,7 +44,7 @@ export function KeyForm({ sourceId, fields, onSave }: KeyFormProps): ReactElemen
         )
       })}
       <Button size="sm" disabled={!complete} onClick={() => onSave(values)}>
-        Save key
+        {saveLabel}
       </Button>
     </div>
   )

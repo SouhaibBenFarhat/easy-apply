@@ -13,7 +13,7 @@
   --surface: 0.958 0.008 215;
   --surface-raised: 0.944 0.01 215;
   --surface-hover: 0.93 0.011 215;
-  --header: 0.85 0.012 215;
+  --header: 0.82 0.013 215;
   --overlay: 1 0 215;
   --foreground: 0.175 0.015 215;
   --foreground-muted: 0.47 0.015 215;
@@ -72,8 +72,8 @@
   --surface: 0.185 0.032 215;
   --surface-raised: 0.202 0.034 215;
   --surface-hover: 0.222 0.035 215;
-  --header: 0.25 0.036 215;
-  --overlay: 0.275 0.033 215;
+  --header: 0.35 0.04 215;
+  --overlay: 0.4 0.038 215;
   --foreground: 0.96 0.005 215;
   --foreground-muted: 0.625 0.015 215;
   --foreground-subtle: 0.52 0.015 215;

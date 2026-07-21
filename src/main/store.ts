@@ -13,6 +13,7 @@ interface StoreSchema {
   windowBounds: WindowBounds
   searchProfile: SearchProfile
   syncIntervalHours: number
+  aiEnabled: boolean
 }
 
 export const store: Store<StoreSchema> = new Store<StoreSchema>({
@@ -20,6 +21,7 @@ export const store: Store<StoreSchema> = new Store<StoreSchema>({
     windowBounds: { width: 1400, height: 900 },
     searchProfile: DEFAULT_SEARCH_PROFILE,
     syncIntervalHours: 3,
+    aiEnabled: true,
   },
 })
 

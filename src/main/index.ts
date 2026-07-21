@@ -2,9 +2,12 @@ import { join } from 'node:path'
 import { type AppDatabase, createDatabase } from '@persistence/main'
 import { app, BrowserWindow } from 'electron'
 import { registerDbIpc } from './ipc/db'
+import { registerMailboxIpc } from './ipc/mailbox'
+import { registerModelIpc } from './ipc/model'
 import { registerSettingsIpc } from './ipc/settings'
 import { registerSourcesIpc } from './ipc/sources'
 import { installMenu } from './menu'
+import { ModelManager } from './model'
 import { installContentSecurityPolicy, installWindowGuards } from './security'
 import { store } from './store'
 import { installSync } from './sync'
@@ -66,7 +69,13 @@ app.whenReady().then(async () => {
   })
   registerDbIpc(db)
   registerSourcesIpc(db)
-  installSync(db)
+  registerMailboxIpc(db)
+  const modelManager = new ModelManager()
+  // Seed the persisted AI on/off preference (nothing is loaded yet, so no
+  // dispose happens here).
+  await modelManager.setAiEnabled(store.get('aiEnabled'))
+  registerModelIpc(modelManager)
+  installSync(db, modelManager)
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

@@ -1,8 +1,11 @@
 import type { FeedFilters, StoredJob } from '@sources/shared'
 import { DEFAULT_SEARCH_PROFILE } from '@sources/shared'
 import type {
+  AgentTraceEvent,
   AppSettings,
   ElectronAPI,
+  ModelProgressEvent,
+  ModelStatus,
   ProviderState,
   SourceInfo,
   SyncEvent,
@@ -20,6 +23,18 @@ export interface MockElectronSeed {
   jobs?: StoredJob[]
   providers?: ProviderState[]
   sources?: SourceInfo[]
+  mailboxAccounts?: string[]
+  modelStatus?: ModelStatus
+}
+
+const DEFAULT_MODEL_STATUS: ModelStatus = {
+  state: 'absent',
+  modelId: 'llama-3.1-8b-instruct-q4',
+  displayName: 'Llama 3.1 8B Instruct (Q4)',
+  totalBytes: 4_920_000_000,
+  downloadedBytes: 0,
+  error: null,
+  enabled: true,
 }
 
 // Sensible defaults mirroring the real registry (same order): the five
@@ -91,6 +106,22 @@ const DEFAULT_SOURCES: readonly SourceInfo[] = [
     },
     attribution: { label: 'Jobs by Adzuna', required: true },
   },
+  {
+    sourceId: 'mailbox',
+    displayName: 'Job-alert inbox',
+    homepage: 'https://mail.google.com',
+    enabledByDefault: false,
+    enabled: false,
+    lastSyncAt: null,
+    hasKey: false,
+    requiresKey: {
+      fields: [
+        { id: 'email', label: 'Gmail address', hint: 'you@gmail.com', secret: false },
+        { id: 'app_password', label: 'App password', hint: 'paste the 16-character code' },
+      ],
+    },
+    attribution: { label: 'Your inbox', required: false },
+  },
 ]
 
 function feedOrder(a: StoredJob, b: StoredJob): number {
@@ -148,6 +179,39 @@ export function createSyncEventEmitter(mock: ElectronAPI): (event: SyncEvent) =>
   }
 }
 
+// agent.onTrace subscribers, keyed like the emitters above.
+const traceListenersByNamespace = new WeakMap<
+  ElectronAPI['agent'],
+  Set<(event: AgentTraceEvent) => void>
+>()
+
+// Drives the mock's agent.onTrace subscribers — the stand-in for
+// webContents.send('agent:trace', …).
+export function createAgentTraceEmitter(mock: ElectronAPI): (event: AgentTraceEvent) => void {
+  return (event: AgentTraceEvent): void => {
+    const listeners = traceListenersByNamespace.get(mock.agent)
+    if (listeners === undefined) return
+    for (const listener of [...listeners]) listener(event)
+  }
+}
+
+// model.onProgress subscribers, keyed like the sync emitter above.
+const modelListenersByNamespace = new WeakMap<
+  ElectronAPI['model'],
+  Set<(event: ModelProgressEvent) => void>
+>()
+
+// Pairs with the mock: delivers a ModelProgressEvent to everything the mock's
+// model.onProgress registered — the test-side stand-in for
+// webContents.send('model:progress', …).
+export function createModelProgressEmitter(mock: ElectronAPI): (event: ModelProgressEvent) => void {
+  return (event: ModelProgressEvent): void => {
+    const listeners = modelListenersByNamespace.get(mock.model)
+    if (listeners === undefined) return
+    for (const listener of [...listeners]) listener(event)
+  }
+}
+
 export function createMockElectron(seed: MockElectronSeed = {}): ElectronAPI {
   const settings: AppSettings = {
     searchProfile: DEFAULT_SEARCH_PROFILE,
@@ -158,8 +222,39 @@ export function createMockElectron(seed: MockElectronSeed = {}): ElectronAPI {
   const sources = new Map<string, SourceInfo>(
     (seed.sources ?? DEFAULT_SOURCES).map((info) => [info.sourceId, { ...info }]),
   )
+  // Emails only — the mock, like the real bridge, never holds app passwords.
+  const mailboxAccounts: string[] = [...(seed.mailboxAccounts ?? [])]
 
   const findJob = (id: string): StoredJob | undefined => jobs.find((job) => job.id === id)
+
+  let modelStatus: ModelStatus = { ...(seed.modelStatus ?? DEFAULT_MODEL_STATUS) }
+  const modelListeners = new Set<(event: ModelProgressEvent) => void>()
+  const model: ElectronAPI['model'] = {
+    status: async () => ({ success: true, data: { ...modelStatus } }),
+    download: async () => {
+      modelStatus = { ...modelStatus, state: 'downloading', downloadedBytes: 0, error: null }
+      return { success: true, data: { ...modelStatus } }
+    },
+    cancel: async () => {
+      modelStatus = { ...modelStatus, state: 'absent', downloadedBytes: 0 }
+      return { success: true, data: { ...modelStatus } }
+    },
+    remove: async () => {
+      modelStatus = { ...modelStatus, state: 'absent', downloadedBytes: 0, error: null }
+      return { success: true, data: { ...modelStatus } }
+    },
+    setEnabled: async (enabled) => {
+      modelStatus = { ...modelStatus, enabled }
+      return { success: true, data: { ...modelStatus } }
+    },
+    onProgress: (callback) => {
+      modelListeners.add(callback)
+      return () => {
+        modelListeners.delete(callback)
+      }
+    },
+  }
+  modelListenersByNamespace.set(model, modelListeners)
 
   const syncListeners = new Set<(event: SyncEvent) => void>()
   const sync: ElectronAPI['sync'] = {
@@ -182,6 +277,17 @@ export function createMockElectron(seed: MockElectronSeed = {}): ElectronAPI {
     },
   }
   syncListenersByNamespace.set(sync, syncListeners)
+
+  const traceListeners = new Set<(event: AgentTraceEvent) => void>()
+  const agent: ElectronAPI['agent'] = {
+    onTrace: (callback) => {
+      traceListeners.add(callback)
+      return () => {
+        traceListeners.delete(callback)
+      }
+    },
+  }
+  traceListenersByNamespace.set(agent, traceListeners)
 
   return {
     platform: 'darwin',
@@ -254,7 +360,30 @@ export function createMockElectron(seed: MockElectronSeed = {}): ElectronAPI {
         return { success: true, data: { ...info } }
       },
     },
+    mailbox: {
+      list: async () => ({ success: true, data: mailboxAccounts.map((email) => ({ email })) }),
+      add: async (email, _appPassword) => {
+        const trimmed = email.trim()
+        if (!mailboxAccounts.some((entry) => entry.toLowerCase() === trimmed.toLowerCase()))
+          mailboxAccounts.push(trimmed)
+        // Mirror main: connecting an inbox enables the mailbox source.
+        const info = sources.get('mailbox')
+        if (info !== undefined) {
+          info.hasKey = true
+          info.enabled = true
+        }
+        return { success: true, data: mailboxAccounts.map((email) => ({ email })) }
+      },
+      remove: async (email) => {
+        const key = email.trim().toLowerCase()
+        const index = mailboxAccounts.findIndex((entry) => entry.toLowerCase() === key)
+        if (index >= 0) mailboxAccounts.splice(index, 1)
+        return { success: true, data: mailboxAccounts.map((email) => ({ email })) }
+      },
+    },
+    model,
     sync,
+    agent,
   }
 }
 

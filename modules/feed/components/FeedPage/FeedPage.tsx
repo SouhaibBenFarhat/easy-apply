@@ -24,8 +24,7 @@ function hasActiveFilters(filters: FeedFilters): boolean {
   return (
     filters.workModes !== undefined ||
     filters.sources !== undefined ||
-    filters.hasSalary !== undefined ||
-    (filters.search !== undefined && filters.search.trim() !== '')
+    filters.hasSalary !== undefined
   )
 }
 
@@ -38,17 +37,13 @@ export function FeedPage(): ReactElement {
   // `local` persistence namespace); the search text is ephemeral by design.
   const storedFilters = useStoredFeedFilters()
   const setStoredFilters = useSetStoredFeedFilters()
-  const [search, setSearch] = useState<string>('')
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
 
-  const filters = useMemo<FeedFilters>(
-    () => ({ ...storedFilters.data, ...(search === '' ? {} : { search }) }),
-    [storedFilters.data, search],
-  )
+  // Search-by-company was removed: the filter bar is now tabs + a gear popover
+  // (work mode / salary / sources), all persisted config.
+  const filters = useMemo<FeedFilters>(() => storedFilters.data ?? {}, [storedFilters.data])
   const setFilters = (next: FeedFilters): void => {
-    const { search: nextSearch, ...persistable } = next
-    setSearch(nextSearch ?? '')
-    setStoredFilters.mutate(persistable)
+    setStoredFilters.mutate(next)
   }
 
   const feed = useFeed(filters)
@@ -109,7 +104,9 @@ export function FeedPage(): ReactElement {
 
   return (
     <div className="flex h-full min-h-0">
-      <div className="flex w-[420px] shrink-0 flex-col border-r border-border-subtle">
+      {/* Job-list sidebar (§sidebars): body `background`, header (FilterBar) +
+          footer one step up on `surface`. */}
+      <div className="flex w-[420px] shrink-0 flex-col border-r border-border bg-background">
         <FilterBar filters={filters} sources={sources.data ?? []} onChange={setFilters} />
         {jobs.length === 0 ? (
           <EmptyState
@@ -136,6 +133,9 @@ export function FeedPage(): ReactElement {
             sourceNames={sourceNames}
           />
         )}
+        <footer className="label-caps shrink-0 border-t border-border bg-surface-hover px-3 py-2">
+          {jobs.length} {jobs.length === 1 ? 'job' : 'jobs'}
+        </footer>
       </div>
       <div className="min-w-0 flex-1">
         <JobDetailPane
