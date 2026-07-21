@@ -1,5 +1,6 @@
 import { FeedPage } from '@feed'
 import { SettingsPage } from '@settings'
+import { SourcesPage } from '@sources-page'
 import type { AnyRouter } from '@tanstack/react-router'
 import {
   createMemoryHistory,
@@ -8,9 +9,6 @@ import {
   createRouter,
 } from '@tanstack/react-router'
 import { TrackerPage } from '@tracker'
-import { EmptyState } from '@ui-kit'
-import { Plug } from 'lucide-react'
-import type { ReactElement } from 'react'
 import { RootLayout } from './RootLayout'
 
 // Every route carries its header title.
@@ -24,18 +22,6 @@ const rootRoute = createRootRoute({
   component: RootLayout,
   staticData: { title: 'EasyApply' },
 })
-
-// Placeholder page — replaced by the real feature in PR 14.
-function SourcesPage(): ReactElement {
-  return (
-    <EmptyState
-      className="h-full"
-      icon={<Plug className="size-5" />}
-      title="Coming soon"
-      description="Sources lands in PR 14."
-    />
-  )
-}
 
 const feedRoute = createRoute({
   getParentRoute: () => rootRoute,

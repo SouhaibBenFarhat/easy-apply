@@ -40,7 +40,9 @@ describe('App', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Tracker' })).toBeInTheDocument()
 
     pressMeta('3')
-    expect(await screen.findByText('Sources lands in PR 14.')).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { level: 3, name: 'Arbeitsagentur' }),
+    ).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1, name: 'Sources' })).toBeInTheDocument()
   })
 
