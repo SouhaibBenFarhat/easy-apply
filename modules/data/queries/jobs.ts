@@ -1,6 +1,6 @@
 import type { FeedFilters, StoredJob } from '@sources/shared'
 import type { UseQueryResult } from '@tanstack/react-query'
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { unwrap } from '../ipc'
 import { keys } from '../keys'
 
@@ -8,6 +8,10 @@ export function useFeed(filters: FeedFilters = {}): UseQueryResult<StoredJob[], 
   return useQuery({
     queryKey: keys.jobs.feed(filters),
     queryFn: async () => unwrap(await window.electron.db.jobs.list(filters)),
+    // Filter changes change the key; keep the previous rows on screen while
+    // the new query resolves so the feed never blanks once populated
+    // (PLAN.md §4.8/§6 anti-flash rule).
+    placeholderData: keepPreviousData,
   })
 }
 

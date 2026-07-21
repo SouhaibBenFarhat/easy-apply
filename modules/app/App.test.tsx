@@ -21,9 +21,9 @@ function pressMeta(key: string): void {
 }
 
 describe('App', () => {
-  it('renders the sidebar nav and lands on the feed placeholder', async () => {
+  it('renders the sidebar nav and lands on the feed', async () => {
     render(<App />)
-    expect(await screen.findByText('Feed lands in PR 12.')).toBeInTheDocument()
+    expect(await screen.findByText('No jobs yet')).toBeInTheDocument()
     for (const name of ['Feed', 'Tracker', 'Sources', 'Settings']) {
       expect(screen.getByRole('menuitem', { name })).toBeInTheDocument()
     }
@@ -33,7 +33,7 @@ describe('App', () => {
 
   it('meta+2..4 switch pages and update the header title', async () => {
     render(<App />)
-    await screen.findByText('Feed lands in PR 12.')
+    await screen.findByText('No jobs yet')
 
     pressMeta('2')
     expect(await screen.findByText('Tracker lands in PR 13.')).toBeInTheDocument()
@@ -46,12 +46,12 @@ describe('App', () => {
 
   it('meta+[ walks back through history', async () => {
     render(<App />)
-    await screen.findByText('Feed lands in PR 12.')
+    await screen.findByText('No jobs yet')
     pressMeta('2')
     await screen.findByText('Tracker lands in PR 13.')
 
     pressMeta('[')
-    expect(await screen.findByText('Feed lands in PR 12.')).toBeInTheDocument()
+    expect(await screen.findByText('No jobs yet')).toBeInTheDocument()
     pressMeta(']')
     expect(await screen.findByText('Tracker lands in PR 13.')).toBeInTheDocument()
   })
@@ -59,7 +59,7 @@ describe('App', () => {
   it('sidebar navigation opens the settings page', async () => {
     const user = userEvent.setup()
     render(<App />)
-    await screen.findByText('Feed lands in PR 12.')
+    await screen.findByText('No jobs yet')
 
     await user.click(screen.getByRole('menuitem', { name: 'Settings' }))
     expect(await screen.findByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument()
@@ -70,7 +70,7 @@ describe('App', () => {
     const now = vi.spyOn(window.electron.sync, 'now')
     const user = userEvent.setup()
     render(<App />)
-    await screen.findByText('Feed lands in PR 12.')
+    await screen.findByText('No jobs yet')
 
     await user.click(screen.getByRole('button', { name: 'Sync now' }))
     await waitFor(() => expect(now).toHaveBeenCalledTimes(1))
@@ -80,7 +80,7 @@ describe('App', () => {
   it('the theme toggle cycles dark → light', async () => {
     const user = userEvent.setup()
     render(<App />)
-    await screen.findByText('Feed lands in PR 12.')
+    await screen.findByText('No jobs yet')
 
     await user.click(screen.getByRole('button', { name: 'Toggle theme' }))
     await waitFor(() => expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('light'))
