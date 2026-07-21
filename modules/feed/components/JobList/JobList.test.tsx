@@ -40,7 +40,7 @@ describe('JobList', () => {
     const jobs = Array.from({ length: 30 }, (_, i) => makeJob({ title: `Job number ${i}` }))
     const { container } = renderList({ jobs })
 
-    // 600px viewport / 76px rows + overscan 8 → a strict subset renders.
+    // 600px viewport / 64px rows + overscan 8 → a strict subset renders.
     expect(screen.getByRole('button', { name: /Job number 0\b/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Job number 1\b/ })).toBeInTheDocument()
     const rendered = screen.getAllByRole('button')
@@ -49,7 +49,7 @@ describe('JobList', () => {
 
     // Total scroll height accounts for every row, not just the rendered ones.
     const sizer = container.querySelector('[style*="height"]')
-    expect(sizer).toHaveStyle({ height: `${30 * 76}px` })
+    expect(sizer).toHaveStyle({ height: `${30 * 64}px` })
   })
 
   it('shows title, meta line, badges and salary on a row', () => {
@@ -66,10 +66,13 @@ describe('JobList', () => {
 
     const row = screen.getByRole('button', { name: /Senior TypeScript Engineer/ })
     expect(within(row).getByText('€60k–€80k')).toBeInTheDocument()
-    expect(within(row).getByText(/Petrol GmbH · München ·/)).toBeInTheDocument()
+    // One quiet meta line, fixed order — and zero redundancy: remote rows
+    // show the SCOPE as their place (the mode slot already says REMOTE), so
+    // the city is dropped. Time + source are right-anchored, never truncated.
     expect(within(row).getByText('Remote')).toBeInTheDocument()
-    expect(within(row).getByText('Europe')).toBeInTheDocument()
-    expect(within(row).getByText('Arbeitnow')).toBeInTheDocument()
+    expect(within(row).getByText('Petrol GmbH · Europe')).toBeInTheDocument()
+    expect(within(row).getByText(/· Arbeitnow$/)).toBeInTheDocument()
+    expect(within(row).queryByText(/München/)).not.toBeInTheDocument()
     expect(within(row).getByText('Applied')).toBeInTheDocument()
   })
 
@@ -83,8 +86,9 @@ describe('JobList', () => {
     renderList({ jobs: [job] })
     const row = screen.getByRole('button')
     expect(within(row).getByText(/Somewhere, DE/)).toBeInTheDocument()
-    expect(within(row).getByText('wwr')).toBeInTheDocument()
-    expect(within(row).getByText('?')).toBeInTheDocument()
+    expect(within(row).getByText(/· wwr$/)).toBeInTheDocument()
+    // Unknown mode renders an empty fixed-width slot, never a "?" chip.
+    expect(within(row).queryByText('?')).not.toBeInTheDocument()
   })
 
   it('marks the selected row and paints the copper indicator', () => {

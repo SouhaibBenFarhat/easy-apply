@@ -14,7 +14,13 @@ export type TabsListProps = ComponentProps<typeof TabsPrimitive.List>
 export function TabsList({ className, ...props }: TabsListProps): ReactElement {
   return (
     <TabsPrimitive.List
-      className={cn('inline-flex h-9 items-center gap-1 rounded-lg bg-surface p-1', className)}
+      // Recessed track (§5.2): the segmented control sits a level BELOW its
+      // container — dark mode: darker well; light mode: brighter paper — and
+      // the active tab pops a level above it.
+      className={cn(
+        'inline-flex h-9 items-center gap-1 rounded-lg border border-border-subtle bg-background p-1',
+        className,
+      )}
       {...props}
     />
   )
@@ -33,7 +39,7 @@ export function TabsTrigger({
       className={cn(
         'inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1',
         'text-sm font-medium text-foreground-muted transition-all',
-        'data-[state=active]:bg-background data-[state=active]:text-foreground',
+        'data-[state=active]:bg-surface-raised data-[state=active]:text-foreground',
         'data-[state=active]:shadow-elevation-low disabled:opacity-40',
         className,
       )}

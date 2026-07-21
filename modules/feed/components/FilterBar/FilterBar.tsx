@@ -83,7 +83,9 @@ export function FilterBar({ filters, sources, onChange }: FilterBarProps): React
   }
 
   return (
-    <div className="glass sticky top-0 z-10 flex shrink-0 flex-col gap-2 p-2">
+    // Solid ladder step (surface), not glass — stacked glass panels read as
+    // glowing slabs; only the app header carries the material (§5.3).
+    <div className="sticky top-0 z-10 flex shrink-0 flex-col gap-2 border-b border-border-subtle bg-surface p-2">
       <Tabs
         value={workModeTab(filters.workModes)}
         onValueChange={(value) => {

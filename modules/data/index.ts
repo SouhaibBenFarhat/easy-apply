@@ -42,7 +42,7 @@ export {
   useSetJobNotes,
   useSetJobStatus,
 } from './mutations/jobs'
-export { useMarkFeedVisited } from './mutations/local'
+export { useMarkFeedVisited, useSetStoredFeedFilters } from './mutations/local'
 export { useSetAppSettings } from './mutations/settings'
 export {
   type ClearSourceKeyVariables,
@@ -55,7 +55,13 @@ export {
 export { useSyncNow } from './mutations/sync'
 export { useSetTheme } from './mutations/theme'
 export { useFeed, useJob } from './queries/jobs'
-export { LAST_FEED_VISIT_STORAGE_KEY, useLastFeedVisit } from './queries/local'
+export {
+  FEED_FILTERS_STORAGE_KEY,
+  LAST_FEED_VISIT_STORAGE_KEY,
+  readStoredFeedFilters,
+  useLastFeedVisit,
+  useStoredFeedFilters,
+} from './queries/local'
 export { useAppSettings } from './queries/settings'
 export { useSources } from './queries/sources'
 export { useSyncStatus } from './queries/sync'

@@ -59,19 +59,25 @@ export function JobDetailPane({
   return (
     <div key={job.id} className="relative h-full min-h-0 animate-fade-in">
       <ScrollArea className="h-full">
-        {/* §5.3 glass slot 3: the detail header; description scrolls under it. */}
-        <header className="glass sticky top-0 z-10 flex flex-col gap-2 px-6 py-4">
+        {/* Sticky at the pane's own level: content fades under a translucent
+            same-tone veil instead of a brighter glass slab (§5.2 — a surface
+            sits only one step above its base). */}
+        <header className="sticky top-0 z-10 flex flex-col gap-2 border-b border-border-subtle bg-background/90 px-6 py-4 backdrop-blur-md">
           <h2 className="truncate text-lg font-semibold">{job.title}</h2>
           <p className="label-caps truncate">
             {job.company} · {job.city ?? job.locationRaw} · posted{' '}
             {formatRelativeTime(job.postedAt ?? job.firstSeenAt)}
           </p>
           <div className="flex flex-wrap items-center gap-1.5">
-            <Badge variant="outline">{workModeLabel(job.workMode)}</Badge>
+            {job.workMode !== 'unknown' ? (
+              <Badge variant="outline">{workModeLabel(job.workMode)}</Badge>
+            ) : null}
             {job.remoteScope !== null ? (
               <Badge variant="outline">{remoteScopeLabel(job.remoteScope)}</Badge>
             ) : null}
-            {salary !== null ? <Badge variant="copper">{salary}</Badge> : null}
+            {salary !== null ? (
+              <span className="text-sm font-semibold tabular-nums text-primary">{salary}</span>
+            ) : null}
             {job.status !== null ? (
               <Badge variant={STATUS_VARIANTS[job.status]}>
                 {STATUSES.find((entry) => entry.status === job.status)?.label}

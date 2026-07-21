@@ -13,17 +13,13 @@ export function FeedSkeleton(): ReactElement {
           <Skeleton className="h-9 w-full" />
           <Skeleton className="h-8 w-full" />
         </div>
-        {[0, 1, 2, 3, 4, 5].map((index) => (
+        {[0, 1, 2, 3, 4, 5, 6, 7].map((index) => (
           <div
             key={index}
-            className="flex h-[76px] flex-col justify-center gap-1.5 border-b border-border-subtle px-3 py-2"
+            className="flex h-[64px] flex-col justify-center gap-1.5 border-b border-border-subtle px-3 py-2"
           >
             <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-3 w-1/2" />
-            <div className="flex items-center gap-1">
-              <Skeleton className="h-[22px] w-14 rounded-full" />
-              <Skeleton className="h-[22px] w-20 rounded-full" />
-            </div>
+            <Skeleton className="h-3 w-2/3" />
           </div>
         ))}
       </div>

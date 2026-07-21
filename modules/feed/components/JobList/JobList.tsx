@@ -35,7 +35,15 @@ const STATUS_LABELS: Record<JobStatus, string> = {
 }
 
 const DIVIDER_SIZE = 32
-const ROW_SIZE = 76
+// Two-line row: py-2 (16) + title line (20) + gap (6) + meta line (~16) ≈ 58.
+const ROW_SIZE = 64
+// Rows with a salary carry a third line (copper figure) — sized per row via
+// estimateSize, the same mechanism the divider row uses.
+const SALARY_ROW_SIZE = 84
+
+function hasSalary(job: StoredJob): boolean {
+  return job.salary.min !== null || job.salary.max !== null
+}
 
 // §5.5 — the staggered fade+rise entrance runs once per app launch, never on
 // refetch, filter change or scroll. Module scope survives remounts.
@@ -74,7 +82,11 @@ export function JobList({
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: (index) => (rows[index]?.kind === 'divider' ? DIVIDER_SIZE : ROW_SIZE),
+    estimateSize: (index) => {
+      const row = rows[index]
+      if (row === undefined || row.kind === 'divider') return DIVIDER_SIZE
+      return hasSalary(row.job) ? SALARY_ROW_SIZE : ROW_SIZE
+    },
     getItemKey: (index) => {
       const row = rows[index]
       return row === undefined || row.kind === 'divider' ? 'new-divider' : row.job.id
@@ -115,6 +127,19 @@ export function JobList({
           const salary = formatSalary(job.salary)
           const selected = job.id === selectedId
           const stagger = animateEntrance && jobIndex < 10
+          // One place token, zero redundancy: remote rows show the SCOPE as
+          // their place (the mode slot already says REMOTE — never echo it,
+          // and multi-country restriction lists are noise); on-site/hybrid
+          // rows show the city.
+          const scopeLabel = job.remoteScope !== null ? remoteScopeLabel(job.remoteScope) : null
+          const rawPlace = job.city ?? job.locationRaw
+          const bareRemotePlace = /^remote$/i.test(rawPlace.trim()) || /anywhere/i.test(rawPlace)
+          const place =
+            job.workMode === 'remote'
+              ? (scopeLabel ?? (bareRemotePlace ? null : rawPlace))
+              : rawPlace
+          const metaLeft = place === null ? job.company : `${job.company} · ${place}`
+          const metaRight = `${formatRelativeTime(job.postedAt ?? job.firstSeenAt)} · ${sourceNames[job.sourceId] ?? job.sourceId}`
           return (
             <div key={item.key} style={style}>
               <button
@@ -144,26 +169,26 @@ export function JobList({
                   >
                     {job.title}
                   </span>
-                  {salary !== null ? (
-                    <Badge variant="copper" className="ml-auto shrink-0">
-                      {salary}
+                  {job.status !== null ? (
+                    <Badge variant={STATUS_VARIANTS[job.status]} className="ml-auto shrink-0">
+                      {STATUS_LABELS[job.status]}
                     </Badge>
                   ) : null}
                 </span>
-                <span className="label-caps w-full truncate">
-                  {job.company} · {job.city ?? job.locationRaw} ·{' '}
-                  {formatRelativeTime(job.postedAt ?? job.firstSeenAt)}
+                {/* §5.4 scannability: a fixed-width mode slot keeps every row's
+                    meta starting at the same x — no chip zigzag. */}
+                {/* Time + source are right-anchored and never truncate; the
+                    company/place group absorbs all the squeeze. */}
+                <span className="label-caps flex w-full items-baseline gap-2">
+                  <span className="w-[4.5rem] shrink-0">{workModeLabel(job.workMode)}</span>
+                  <span className="min-w-0 flex-1 truncate">{metaLeft}</span>
+                  <span className="shrink-0">{metaRight}</span>
                 </span>
-                <span className="flex w-full items-center gap-1 overflow-hidden">
-                  <Badge variant="outline">{workModeLabel(job.workMode)}</Badge>
-                  {job.remoteScope !== null ? (
-                    <Badge variant="outline">{remoteScopeLabel(job.remoteScope)}</Badge>
-                  ) : null}
-                  <Badge>{sourceNames[job.sourceId] ?? job.sourceId}</Badge>
-                  {job.status !== null ? (
-                    <Badge variant={STATUS_VARIANTS[job.status]}>{STATUS_LABELS[job.status]}</Badge>
-                  ) : null}
-                </span>
+                {salary !== null ? (
+                  // Third line: the salary as plain copper text — the figure
+                  // is the signal, no chip (§5.1 copper scarcity).
+                  <span className="text-xs font-semibold tabular-nums text-primary">{salary}</span>
+                ) : null}
               </button>
             </div>
           )

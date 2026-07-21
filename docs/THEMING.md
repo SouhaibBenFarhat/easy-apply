@@ -102,7 +102,8 @@ in exactly five places:
 2. the primary button,
 3. the active nav item,
 4. the focus ring,
-5. the salary badge — the one warm data point in the feed.
+5. the salary figure — plain copper *text*, never a chip; the one warm data
+   point in the feed.
 
 Everything else is petrol/neutral. Status colors map as: applied = `success`,
 interview = `info`, interested = `warning`, rejected = `destructive` — all
@@ -116,12 +117,17 @@ One recipe, defined in `globals.css`: `.glass` = `oklch(var(--header) / 0.66)`
 `.glass-overlay` (`overlay/0.85` + `blur(20px)`). A `@supports not
 (backdrop-filter: …)` fallback drops to the solid token.
 
-**Glass only where content scrolls underneath it:**
+**Glass appears in exactly two places:**
 
 1. the window header bar (traffic-light zone),
-2. the sticky filter bar above the virtualized feed,
-3. the detail-pane header (the description scrolls beneath),
-4. overlays — dialogs, popovers, toasts.
+2. overlays — dialogs, popovers, toasts (`.glass-overlay`).
+
+**Sticky in-content headers are NOT glass.** The feed filter bar is a solid
+`bg-surface` ladder step; the detail-pane header is a translucent veil of its
+*own* level (`bg-background/90 backdrop-blur-md`) so content fades under it
+without a brighter slab. Rationale: `.glass` carries the `--header` token —
+painting large or stacked regions with the brightest chrome tone breaks the
+elevation ladder and reads as glowing panels (the v0.1.0 lesson).
 
 **Never glass:** feed rows, cards, the sidebar at rest, any large static area
 — blur everywhere reads as mud and costs GPU. Hard budget: **at most 3

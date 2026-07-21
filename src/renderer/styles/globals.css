@@ -72,7 +72,7 @@
   --surface: 0.185 0.032 215;
   --surface-raised: 0.202 0.034 215;
   --surface-hover: 0.222 0.035 215;
-  --header: 0.31 0.036 215;
+  --header: 0.25 0.036 215;
   --overlay: 0.275 0.033 215;
   --foreground: 0.96 0.005 215;
   --foreground-muted: 0.625 0.015 215;
@@ -85,7 +85,7 @@
   --interactive-active: 0.27 0.022 215;
   --primary: 0.68 0.13 60;
   --primary-foreground: 0.13 0.01 215;
-  --input: 0.185 0.032 215;
+  --input: 0.128 0.028 215;
   --ring: 0.68 0.13 60;
   --success: 0.7 0.13 155;
   --success-foreground: 0.13 0.005 215;
@@ -119,6 +119,29 @@
   html {
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+  }
+
+  /* Thin token-colored scrollbars — the OS default draws a heavy bar over
+   * row content. Transparent track, pill thumb, no arrows. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(var(--border) / 0.9);
+    border-radius: 5px;
+    border: 3px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(var(--foreground-ghost) / 0.9);
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
   }
 
   body {

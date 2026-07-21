@@ -53,10 +53,14 @@ Read `docs/ARCHITECTURE.md` for the map. These are the laws; the skills in
   `pnpm generate:theme` after editing it (never edit the GENERATED blocks in
   `globals.css`).
 - **Copper is scarce.** It appears in exactly five places: selected job row,
-  primary button, active nav item, focus ring, salary badge. Nothing else.
-- **Glass only where content scrolls underneath** (header bar, sticky filter
-  bar, detail-pane header, overlays) — at most 3 backdrop-filter layers on
-  screen. Never on feed rows, cards, or static areas.
+  primary button, active nav item, focus ring, and the salary figure — which
+  is plain copper *text*, never a chip. Nothing else.
+- **Glass is rarer than you think**: the top app header bar and overlays
+  (dialogs, popovers, toasts) — nothing else. Sticky in-content headers use a
+  translucent veil of their OWN level (`bg-background/90 backdrop-blur-md`),
+  never the header token: stacked glass slabs break the elevation ladder. At
+  most 3 backdrop-filter layers on screen; never on rows, cards, or static
+  areas.
 - Motion communicates a state change: nothing loops idle, nothing bounces,
   background-color transitions only inside scrolling lists, and
   `prefers-reduced-motion` is honored globally.

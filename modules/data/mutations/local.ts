@@ -1,11 +1,28 @@
+import type { FeedFilters } from '@sources/shared'
 import type { UseMutationResult } from '@tanstack/react-query'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { keys } from '../keys'
-import { LAST_FEED_VISIT_STORAGE_KEY } from '../queries/local'
+import { FEED_FILTERS_STORAGE_KEY, LAST_FEED_VISIT_STORAGE_KEY } from '../queries/local'
 
 // Written on feed blur/visit (PR 12) — moves the "new since last visit"
 // divider. localStorage is the source of truth; the cache write keeps every
 // mounted useLastFeedVisit in step without a refetch.
+// Persists the feed's remembered configuration (tab, salary toggle, source
+// selection). `search` is stripped — typed queries never survive a restart.
+export function useSetStoredFeedFilters(): UseMutationResult<FeedFilters, Error, FeedFilters> {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (next) => {
+      const { search: _ephemeral, ...persistable } = next
+      localStorage.setItem(FEED_FILTERS_STORAGE_KEY, JSON.stringify(persistable))
+      return persistable
+    },
+    onSuccess: (persisted) => {
+      client.setQueryData(keys.local.feedFilters, persisted)
+    },
+  })
+}
+
 export function useMarkFeedVisited(): UseMutationResult<string, Error, void> {
   const client = useQueryClient()
   return useMutation({

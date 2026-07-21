@@ -47,7 +47,7 @@ describe('workModeLabel', () => {
     ['onsite', 'On-site'],
     ['hybrid', 'Hybrid'],
     ['remote', 'Remote'],
-    ['unknown', '?'],
+    ['unknown', ''],
   ]
 
   it.each(cases)('%s → %s', (mode, expected) => {
