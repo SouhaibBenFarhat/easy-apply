@@ -36,7 +36,7 @@ describe('App', () => {
     await screen.findByText('No jobs yet')
 
     pressMeta('2')
-    expect(await screen.findByText('Tracker lands in PR 13.')).toBeInTheDocument()
+    expect(await screen.findByText('Nothing tracked yet')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1, name: 'Tracker' })).toBeInTheDocument()
 
     pressMeta('3')
@@ -48,12 +48,12 @@ describe('App', () => {
     render(<App />)
     await screen.findByText('No jobs yet')
     pressMeta('2')
-    await screen.findByText('Tracker lands in PR 13.')
+    await screen.findByText('Nothing tracked yet')
 
     pressMeta('[')
     expect(await screen.findByText('No jobs yet')).toBeInTheDocument()
     pressMeta(']')
-    expect(await screen.findByText('Tracker lands in PR 13.')).toBeInTheDocument()
+    expect(await screen.findByText('Nothing tracked yet')).toBeInTheDocument()
   })
 
   it('sidebar navigation opens the settings page', async () => {
