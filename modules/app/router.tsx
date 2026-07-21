@@ -7,8 +7,9 @@ import {
   createRoute,
   createRouter,
 } from '@tanstack/react-router'
+import { TrackerPage } from '@tracker'
 import { EmptyState } from '@ui-kit'
-import { ClipboardList, Plug } from 'lucide-react'
+import { Plug } from 'lucide-react'
 import type { ReactElement } from 'react'
 import { RootLayout } from './RootLayout'
 
@@ -24,18 +25,7 @@ const rootRoute = createRootRoute({
   staticData: { title: 'EasyApply' },
 })
 
-// Placeholder pages — replaced by the real features in PRs 13–14.
-function TrackerPage(): ReactElement {
-  return (
-    <EmptyState
-      className="h-full"
-      icon={<ClipboardList className="size-5" />}
-      title="Coming soon"
-      description="Tracker lands in PR 13."
-    />
-  )
-}
-
+// Placeholder page — replaced by the real feature in PR 14.
 function SourcesPage(): ReactElement {
   return (
     <EmptyState
