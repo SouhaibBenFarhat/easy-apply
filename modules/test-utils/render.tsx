@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { RenderHookOptions, RenderHookResult, RenderResult } from '@testing-library/react'
 import { render as rtlRender, renderHook as rtlRenderHook } from '@testing-library/react'
+import { TooltipProvider } from '@ui-kit'
 import type { ReactElement, ReactNode } from 'react'
 
 // Deterministic client for tests: no retries (IpcResult failures surface as
@@ -22,8 +23,10 @@ export function createTestQueryClient(): QueryClient {
 }
 
 // Providers accumulate here as the app grows: QueryClientProvider (PR 10),
-// router + TooltipProvider (PR 11). Feature tests always use this render.
-// Pass { client } to assert on / seed the query cache from the test.
+// TooltipProvider (PR 11). No router here — shell components are router-free
+// by design, and @app tests mount the real router via <App />. Feature tests
+// always use this render. Pass { client } to assert on / seed the query cache
+// from the test.
 export interface AppRenderOptions {
   client?: QueryClient
 }
@@ -31,7 +34,11 @@ export interface AppRenderOptions {
 export function render(ui: ReactElement, options: AppRenderOptions = {}): RenderResult {
   const client = options.client ?? createTestQueryClient()
   function Providers({ children }: { children: ReactNode }): ReactElement {
-    return <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    return (
+      <QueryClientProvider client={client}>
+        <TooltipProvider>{children}</TooltipProvider>
+      </QueryClientProvider>
+    )
   }
   return rtlRender(ui, { wrapper: Providers })
 }
@@ -50,7 +57,11 @@ export function renderHook<Result, Props>(
   const queryClient = client ?? createTestQueryClient()
   function Providers({ children }: { children: ReactNode }): ReactElement {
     const inner = InnerWrapper === undefined ? children : <InnerWrapper>{children}</InnerWrapper>
-    return <QueryClientProvider client={queryClient}>{inner}</QueryClientProvider>
+    return (
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>{inner}</TooltipProvider>
+      </QueryClientProvider>
+    )
   }
   return rtlRenderHook(callback, { ...rest, wrapper: Providers })
 }
