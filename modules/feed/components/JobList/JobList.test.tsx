@@ -50,9 +50,9 @@ describe('JobList', () => {
 
   it('renders flat rows inside the scroll container (virtualizer smoke)', () => {
     const jobs = Array.from({ length: 30 }, (_, i) => makeJob({ title: `Job number ${i}` }))
-    const { container } = renderList({ jobs })
+    renderList({ jobs })
 
-    // 600px viewport / 64px rows + overscan 8 → a strict subset renders.
+    // 600px viewport / 78px card slots + overscan 8 → a strict subset renders.
     expect(screen.getByRole('button', { name: /Job number 0\b/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Job number 1\b/ })).toBeInTheDocument()
     const rendered = screen.getAllByRole('button')
@@ -60,11 +60,10 @@ describe('JobList', () => {
     expect(rendered.length).toBeLessThan(30)
 
     // Total scroll height accounts for every row, not just the rendered ones.
-    const sizer = container.querySelector('[style*="height"]')
-    expect(sizer).toHaveStyle({ height: `${30 * 64}px` })
+    expect(screen.getByTestId('virtual-sizer')).toHaveStyle({ height: `${30 * 78}px` })
   })
 
-  it('shows title, meta line, badges and salary on a row', () => {
+  it('shows title, source, mode and salary lines on a row', () => {
     const job = makeJob({
       title: 'Senior TypeScript Engineer',
       company: 'Petrol GmbH',
@@ -72,18 +71,19 @@ describe('JobList', () => {
       workMode: 'remote',
       remoteScope: 'europe',
       status: 'applied',
+      postedAt: new Date(Date.now() - 3_600_000).toISOString(),
       salary: makeSalary({ min: 60000, max: 80000, currency: 'EUR' }),
     })
     renderList({ jobs: [job] })
 
     const row = screen.getByRole('button', { name: /Senior TypeScript Engineer/ })
     expect(within(row).getByText('€60k–€80k')).toBeInTheDocument()
-    // One quiet meta line, fixed order — and zero redundancy: remote rows
-    // show the SCOPE as their place (the mode slot already says REMOTE), so
-    // the city is dropped. Time + source are right-anchored, never truncated.
-    expect(within(row).getByText('Remote')).toBeInTheDocument()
-    expect(within(row).getByText('Petrol GmbH · Europe')).toBeInTheDocument()
-    expect(within(row).getByText(/· Arbeitnow$/)).toBeInTheDocument()
+    // Three quiet lines, fixed order: where (place · work style), then where
+    // it came from (source · company) with the time right-anchored. Remote
+    // rows show the SCOPE as their place, so the city is dropped.
+    expect(within(row).getByText('Europe · Remote')).toBeInTheDocument()
+    expect(within(row).getByText('Arbeitnow · Petrol GmbH')).toBeInTheDocument()
+    expect(within(row).getByText('1 hour ago')).toBeInTheDocument()
     expect(within(row).queryByText(/München/)).not.toBeInTheDocument()
     expect(within(row).getByText('Applied')).toBeInTheDocument()
   })
@@ -97,9 +97,9 @@ describe('JobList', () => {
     })
     renderList({ jobs: [job] })
     const row = screen.getByRole('button')
-    expect(within(row).getByText(/Somewhere, DE/)).toBeInTheDocument()
-    expect(within(row).getByText(/· wwr$/)).toBeInTheDocument()
-    // Unknown mode renders an empty fixed-width slot, never a "?" chip.
+    // Unknown mode drops out of the place line — no "?", no dangling separator.
+    expect(within(row).getByText('Somewhere, DE')).toBeInTheDocument()
+    expect(within(row).getByText('wwr · Acme GmbH')).toBeInTheDocument()
     expect(within(row).queryByText('?')).not.toBeInTheDocument()
   })
 

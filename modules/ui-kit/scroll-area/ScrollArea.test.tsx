@@ -32,4 +32,10 @@ describe('ScrollArea', () => {
     render(<ScrollArea data-testid="scroll-root">content</ScrollArea>)
     expect(screen.getByTestId('scroll-root')).toBeInTheDocument()
   })
+
+  it('exposes the scrollable viewport through viewportRef', () => {
+    const ref = { current: null as HTMLDivElement | null }
+    const { container } = render(<ScrollArea viewportRef={ref}>content</ScrollArea>)
+    expect(ref.current).toBe(container.querySelector('[data-radix-scroll-area-viewport]'))
+  })
 })

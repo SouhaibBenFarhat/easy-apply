@@ -88,10 +88,13 @@ header`). Borders do the separation work in light mode; the theme-varied
 dark (`globals.css`).
 
 **No card nesting.** A surface may only sit on the level directly beneath it.
-Content areas are flat; cards are reserved for the detail pane and the Sources
-page, never nested inside other cards. Feed rows are flat ListMenu-style rows
-(hairline `border-b border-border-subtle`, `hover:bg-interactive-hover`) —
-not floating cards.
+Content areas are flat; cards are reserved for the detail pane, the Sources
+page and feed rows, never nested inside other cards. Feed rows are card rows
+with the house Card treatment (`bg-surface-raised` + `border-border` +
+`rounded-lg` + `shadow-elevation-low`, 10px gutters); the shadow is static —
+only background-color transitions inside the scrolling list — and the
+selected card swaps to the copper treatment (`primary/10` fill +
+`border-primary`).
 
 ## Copper scarcity
 
