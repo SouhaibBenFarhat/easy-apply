@@ -1,16 +1,27 @@
 import { Corner, Root, Scrollbar, Thumb, Viewport } from '@radix-ui/react-scroll-area'
-import type { ComponentProps, ReactElement } from 'react'
+import type { ComponentProps, ReactElement, Ref } from 'react'
 import { cn } from '../utils'
 
-export interface ScrollAreaProps extends ComponentProps<typeof Root> {}
+export interface ScrollAreaProps extends ComponentProps<typeof Root> {
+  /** Ref to the scrollable viewport element — for virtualizers that need
+   * the real scroll container (e.g. TanStack Virtual's getScrollElement). */
+  viewportRef?: Ref<HTMLDivElement>
+}
 
-export function ScrollArea({ className, children, ...props }: ScrollAreaProps): ReactElement {
+export function ScrollArea({
+  className,
+  children,
+  viewportRef,
+  ...props
+}: ScrollAreaProps): ReactElement {
   return (
     <Root className={cn('relative overflow-hidden', className)} {...props}>
       {/* Radix wraps children in a display:table div sized to max-content, which
           breaks `truncate` on descendants (they overflow instead of ellipsing).
           Force it to block so children are constrained to the viewport width. */}
-      <Viewport className="h-full w-full rounded-[inherit] [&>div]:!block">{children}</Viewport>
+      <Viewport ref={viewportRef} className="h-full w-full rounded-[inherit] [&>div]:!block">
+        {children}
+      </Viewport>
       <ScrollBar />
       <Corner />
     </Root>

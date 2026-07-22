@@ -14,12 +14,12 @@ export function FeedSkeleton(): ReactElement {
           <Skeleton className="h-8 w-full" />
         </div>
         {[0, 1, 2, 3, 4, 5, 6, 7].map((index) => (
-          <div
-            key={index}
-            className="flex h-[64px] flex-col justify-center gap-1.5 border-b border-border-subtle px-3 py-2"
-          >
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-3 w-2/3" />
+          <div key={index} className="px-3 pt-2.5">
+            <div className="flex h-[68px] flex-col justify-center gap-1 rounded-lg border border-border bg-surface-raised px-3 py-2 shadow-elevation-low">
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+              <Skeleton className="h-3 w-2/3" />
+            </div>
           </div>
         ))}
       </div>

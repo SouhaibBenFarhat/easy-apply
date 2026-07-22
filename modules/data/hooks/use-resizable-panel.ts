@@ -34,10 +34,14 @@ export function useResizablePanel(
   const setStored = useSetStoredPanelWidths()
   const persisted = stored.data ?? DEFAULT_PANEL_WIDTHS
   // Live width during a drag; null when not dragging (fall back to persisted).
-  const [drag, setDrag] = useState<number | null>(null)
+  // Mirrored in a ref because a keyboard nudge fires start → resize → end in a
+  // SINGLE batched update, where the state value would still read null and the
+  // nudge would be dropped before it ever reached storage.
+  const [dragWidth, setDragWidth] = useState<number | null>(null)
+  const dragRef = useRef<number | null>(null)
   const startWidth = useRef(0)
 
-  const width = clamp(drag ?? persisted[panel], min, max)
+  const width = clamp(dragWidth ?? persisted[panel], min, max)
 
   const onResizeStart = useCallback(() => {
     startWidth.current = width
@@ -46,16 +50,30 @@ export function useResizablePanel(
   const onResize = useCallback(
     (deltaX: number) => {
       const signed = grows === 'right' ? deltaX : -deltaX
-      setDrag(clamp(startWidth.current + signed, min, max))
+      const next = clamp(startWidth.current + signed, min, max)
+      dragRef.current = next
+      setDragWidth(next)
     },
     [grows, min, max],
   )
 
   const onResizeEnd = useCallback(() => {
-    if (drag === null) return
-    setStored.mutate({ ...persisted, [panel]: drag })
-    setDrag(null)
-  }, [drag, persisted, panel, setStored])
+    const next = dragRef.current
+    if (next === null) return
+    dragRef.current = null
+    setStored.mutate(
+      { ...persisted, [panel]: next },
+      {
+        // Release the live width only once the persisted value has caught up.
+        // Clearing it up front would render a frame at the OLD persisted width
+        // while the mutation is still in flight — the snap-back on release.
+        // A drag that started in the meantime owns the width, so leave it be.
+        onSettled: () => {
+          if (dragRef.current === null) setDragWidth(null)
+        },
+      },
+    )
+  }, [persisted, panel, setStored])
 
   return { width, min, max, onResizeStart, onResize, onResizeEnd }
 }

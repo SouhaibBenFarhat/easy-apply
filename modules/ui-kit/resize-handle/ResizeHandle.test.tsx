@@ -45,6 +45,16 @@ describe('ResizeHandle', () => {
     expect(handle).toHaveAttribute('aria-valuemax', '600')
   })
 
+  // Regression: a wider handle box opens a visible gutter between the panels
+  // it divides. The line stays 1px — exactly the border it replaced — and the
+  // grab zone is an invisible pseudo-element instead.
+  it('occupies only 1px of layout width', () => {
+    setup()
+    const handle = screen.getByRole('separator', { name: 'Resize' })
+    expect(handle).toHaveClass('w-px')
+    expect(handle.className).not.toMatch(/\bw-(?:1\.5|1|2|3)\b/)
+  })
+
   it('reports the drag delta across pointer down → move → up', () => {
     const { onResizeStart, onResize, onResizeEnd } = setup()
     const handle = screen.getByRole('separator', { name: 'Resize' })

@@ -2,8 +2,8 @@ import type { JobStatus, StoredJob } from '@sources/shared'
 import { isAgentSource } from '@sources/shared'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { BadgeProps } from '@ui-kit'
-import { Badge, cn, formatRelativeTime } from '@ui-kit'
-import { Sparkles } from 'lucide-react'
+import { Badge, cn, formatRelativeTime, ScrollArea } from '@ui-kit'
+import { MapPin, Plug, Sparkles } from 'lucide-react'
 import type { CSSProperties, ReactElement } from 'react'
 import { useMemo, useRef, useState } from 'react'
 import { formatSalary, remoteScopeLabel, workModeLabel } from '../../lib/format'
@@ -36,12 +36,18 @@ const STATUS_LABELS: Record<JobStatus, string> = {
   rejected: 'Rejected',
 }
 
+// Lucide draws at a 2px stroke by default, which reads as a blob at 12px —
+// the meta icons go hairline so they carry the same optical weight as the
+// quiet caps text they prefix.
+const META_ICON_STROKE = 1.5
+
 const DIVIDER_SIZE = 32
-// Two-line row: py-2 (16) + title line (20) + gap (6) + meta line (~16) ≈ 58.
-const ROW_SIZE = 64
-// Rows with a salary carry a third line (copper figure) — sized per row via
-// estimateSize, the same mechanism the divider row uses.
-const SALARY_ROW_SIZE = 84
+// Card slot: 10px gutter + bordered card (borders 2 + py-2 16 + title 20 +
+// 2 × (gap 4 + meta ~11) ≈ 68) ≈ 78.
+const ROW_SIZE = 78
+// Cards with a salary carry a fourth line (copper figure, +20px) — sized per
+// row via estimateSize, the same mechanism the divider row uses.
+const SALARY_ROW_SIZE = 98
 
 function hasSalary(job: StoredJob): boolean {
   return job.salary.min !== null || job.salary.max !== null
@@ -101,8 +107,17 @@ export function JobList({
   })
 
   return (
-    <div ref={parentRef} className="min-h-0 flex-1 overflow-auto">
-      <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
+    // Radix ScrollArea: the thumb floats OVER the cards and auto-hides, so no
+    // scrollbar lane is reserved and the card gutters stay symmetric. The
+    // virtualizer scrolls the viewport element via viewportRef.
+    <ScrollArea className="min-h-0 flex-1" viewportRef={parentRef}>
+      {/* Bottom inset lives on a sibling spacer — padding on the sizer would
+          be swallowed by its border-box inline height. */}
+      <div
+        data-testid="virtual-sizer"
+        className="relative w-full"
+        style={{ height: virtualizer.getTotalSize() }}
+      >
         {virtualizer.getVirtualItems().map((item) => {
           const row = rows[item.index]
           if (row === undefined) return null
@@ -119,9 +134,13 @@ export function JobList({
               <div
                 key={item.key}
                 style={style}
-                className="flex items-end border-t border-primary/40 px-3 pb-1 animate-fade-in"
+                className="flex items-end px-3 pb-1 animate-fade-in"
               >
-                <span className="label-caps text-primary">New since your last visit</span>
+                {/* The copper hairline sits inside the card gutter so it
+                    aligns with the card edges, not the panel edges. */}
+                <span className="label-caps w-full border-t border-primary/40 pt-1 text-primary">
+                  New since your last visit
+                </span>
               </div>
             )
           }
@@ -130,7 +149,7 @@ export function JobList({
           const selected = job.id === selectedId
           const stagger = animateEntrance && jobIndex < 10
           // One place token, zero redundancy: remote rows show the SCOPE as
-          // their place (the mode slot already says REMOTE — never echo it,
+          // their place (the mode line already says REMOTE — never echo it,
           // and multi-country restriction lists are noise); on-site/hybrid
           // rows show the city.
           const scopeLabel = job.remoteScope !== null ? remoteScopeLabel(job.remoteScope) : null
@@ -140,31 +159,39 @@ export function JobList({
             job.workMode === 'remote'
               ? (scopeLabel ?? (bareRemotePlace ? null : rawPlace))
               : rawPlace
-          const metaLeft = place === null ? job.company : `${job.company} · ${place}`
-          const metaRight = `${formatRelativeTime(job.postedAt ?? job.firstSeenAt)} · ${sourceNames[job.sourceId] ?? job.sourceId}`
+          const sourceName = sourceNames[job.sourceId] ?? job.sourceId
+          // Line 2 is "where": place then work style, either of which can be
+          // absent — join only the parts that exist, never a dangling separator.
+          const placeLine = [place, workModeLabel(job.workMode)]
+            .filter((part): part is string => part !== null && part !== '')
+            .join(' · ')
+          // Line 3 is "where it came from": source then company.
+          const sourceLine = `${sourceName} · ${job.company}`
+          const published = formatRelativeTime(job.postedAt ?? job.firstSeenAt)
           // Jobs the inbox agent extracted get a sparkle accent (info, never
           // copper — copper stays scarce).
           const fromAgent = isAgentSource(job.sourceId)
           return (
-            <div key={item.key} style={style}>
+            <div key={item.key} style={style} className="px-3 pt-2.5">
               <button
                 type="button"
                 data-selected={selected}
                 onClick={() => onSelect(job.id)}
                 className={cn(
-                  // §5.4 — flat row: hairline divider, background-change hover
-                  // only, no transforms inside the scrolling list.
+                  // Card row: the house Card treatment (raised surface, real
+                  // edge, low shadow) with 10px gutters doing the separation.
+                  // Background-color transitions only inside the scrolling
+                  // list — the shadow is static, never animated. The selected
+                  // card is the copper treatment (fill + border, one of the
+                  // five uses).
                   'relative flex h-full w-full flex-col justify-center gap-1 overflow-hidden',
-                  'border-b border-border-subtle px-3 py-2 text-left transition-colors',
-                  'hover:bg-interactive-hover',
-                  selected && 'bg-primary/10',
+                  'rounded-lg border border-border bg-surface-raised px-3 py-2 text-left',
+                  'shadow-elevation-low transition-colors hover:bg-interactive-hover',
+                  selected && 'border-primary bg-primary/10',
                   stagger && 'animate-rise-in',
                 )}
                 style={stagger ? { animationDelay: `${jobIndex * 30}ms` } : undefined}
               >
-                {selected ? (
-                  <span aria-hidden className="absolute inset-y-0 left-0 w-0.5 bg-primary" />
-                ) : null}
                 <span className="flex w-full items-center gap-2">
                   <span
                     className={cn(
@@ -180,28 +207,44 @@ export function JobList({
                     </Badge>
                   ) : null}
                 </span>
-                {/* §5.4 scannability: a fixed-width mode slot keeps every row's
-                    meta starting at the same x — no chip zigzag. */}
-                {/* Time + source are right-anchored and never truncate; the
-                    company/place group absorbs all the squeeze. */}
-                {/* Tight tracking (label-caps defaults to 0.18em, which eats
-                    horizontal room) + a slim mode slot + small gaps, so the
-                    company/place shows as much as possible before truncating. */}
-                <span className="label-caps flex w-full items-baseline gap-1.5 tracking-[0.02em]">
-                  <span className="w-14 shrink-0">{workModeLabel(job.workMode)}</span>
-                  <span className="min-w-0 flex-1 truncate">{metaLeft}</span>
-                  <span className="flex shrink-0 items-center gap-1">
-                    {fromAgent ? (
-                      <Sparkles
-                        className="size-3 text-info"
-                        aria-label="Found by the inbox agent"
-                      />
-                    ) : null}
-                    {metaRight}
-                  </span>
+                {/* §5.4 scannability, two quiet meta lines under the title —
+                    label-caps for size/weight/color but normal case and tight
+                    tracking (its 0.18em uppercase default eats horizontal
+                    room), so each shows as much as possible before truncating.
+                    Both lines lead with a same-size icon on the same gap, so
+                    their text starts on one x. Line 2: place · work style. */}
+                <span className="label-caps flex w-full items-center gap-1.5 normal-case leading-none tracking-[0.02em]">
+                  {/* Decorative pin — the text is the information; no pin when
+                      the job has no place at all. */}
+                  {place !== null ? (
+                    <MapPin
+                      aria-hidden
+                      className="size-3 shrink-0"
+                      strokeWidth={META_ICON_STROKE}
+                    />
+                  ) : null}
+                  <span className="min-w-0 truncate">{placeLine}</span>
+                </span>
+                {/* Line 3: source · company, publish time right-anchored — it
+                    never truncates; the source/company group absorbs all the
+                    squeeze. The leading icon says where the job came from: a
+                    plug for the API sources, the sparkle for inbox-agent finds
+                    (info, never copper). */}
+                <span className="label-caps flex w-full items-center gap-1.5 normal-case leading-none tracking-[0.02em]">
+                  {fromAgent ? (
+                    <Sparkles
+                      className="size-3 shrink-0 text-info"
+                      aria-label="Found by the inbox agent"
+                      strokeWidth={META_ICON_STROKE}
+                    />
+                  ) : (
+                    <Plug aria-hidden className="size-3 shrink-0" strokeWidth={META_ICON_STROKE} />
+                  )}
+                  <span className="min-w-0 flex-1 truncate">{sourceLine}</span>
+                  <span className="shrink-0">{published}</span>
                 </span>
                 {salary !== null ? (
-                  // Third line: the salary as plain copper text — the figure
+                  // Fourth line: the salary as plain copper text — the figure
                   // is the signal, no chip (§5.1 copper scarcity).
                   <span className="text-xs font-semibold tabular-nums text-primary">{salary}</span>
                 ) : null}
@@ -210,6 +253,7 @@ export function JobList({
           )
         })}
       </div>
-    </div>
+      <div aria-hidden className="h-2.5" />
+    </ScrollArea>
   )
 }

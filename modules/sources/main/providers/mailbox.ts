@@ -1,6 +1,6 @@
 import type { NormalizedJob } from '@sources/shared'
 import type { MailAccount, MailMessage } from '../mail'
-import { readRecentMessages } from '../mail'
+import { describeMailError, readRecentMessages } from '../mail'
 import { extractJobsFromEmail } from '../mail-extract'
 import { type MailboxAccount, parseAccounts } from '../mailbox-accounts'
 import type {
@@ -108,18 +108,28 @@ export const mailboxProvider: JobSourceProvider = {
     const collected: Array<{ message: MailMessage; accountEmail: string }> = []
     for (const account of accounts) {
       try {
-        ctx.trace?.({ channel: 'mailbox', label: 'Connecting to an inbox…' })
+        // Every mailbox trace names its account: with several inboxes connected
+        // an anonymous "an inbox failed" is unactionable — you can't tell which
+        // address to go fix.
+        ctx.trace?.({ channel: 'mailbox', label: `Connecting to ${account.email}…` })
         const messages = await readRecentMessages(createMail(toMailAccount(account)), {
           mailbox: MAILBOX,
           since,
         })
-        ctx.trace?.({ channel: 'mailbox', label: `Found ${messages.length} email(s)` })
+        ctx.trace?.({
+          channel: 'mailbox',
+          label: `Found ${messages.length} email(s) in ${account.email}`,
+        })
         collected.push(...messages.map((message) => ({ message, accountEmail: account.email })))
       } catch (error) {
         // One inbox failing (bad password, IMAP hiccup) never sinks the rest.
-        const message = error instanceof Error ? error.message : String(error)
-        ctx.logger.error(`mailbox: read failed for an account — ${message}`)
-        ctx.trace?.({ channel: 'mailbox', label: 'Inbox read failed', body: message })
+        const message = describeMailError(error)
+        ctx.logger.error(`mailbox: read failed for ${account.email} — ${message}`)
+        ctx.trace?.({
+          channel: 'mailbox',
+          label: `Inbox read failed — ${account.email}`,
+          body: message,
+        })
       }
     }
 
