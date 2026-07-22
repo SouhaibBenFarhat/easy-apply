@@ -1,18 +1,11 @@
 import type { AgentPipelineStats, AgentTraceEvent } from '@data'
-import { useAgentTrace, usePauseAgent, useResumeAgent, useStopAgent } from '@data'
+import { useAgentState, useAgentTrace, usePauseAgent, useResumeAgent, useStopAgent } from '@data'
 import { Button, cn, ScrollArea } from '@ui-kit'
-import { Activity, Brain, ChevronRight, X } from 'lucide-react'
+import { Activity, Brain, ChevronRight, Play, X } from 'lucide-react'
 import { type ReactElement, useState } from 'react'
 import { PipelineFunnel } from './PipelineFunnel'
-
-function dotColor(event: AgentTraceEvent): string {
-  if (/fail|skipped/i.test(event.label)) return 'bg-destructive'
-  if (event.channel === 'pipeline')
-    return /no jobs/.test(event.label) ? 'bg-foreground-ghost' : 'bg-info'
-  if (event.channel === 'llm') return 'bg-warning'
-  if (event.channel === 'mailbox') return 'bg-info'
-  return 'bg-foreground-muted'
-}
+import { TraceDot, TraceLegend } from './TraceDot'
+import { TraceJobs } from './TraceJobs'
 
 // The most recent funnel snapshot, if any 'pipeline' event has arrived.
 function latestStats(events: AgentTraceEvent[]): AgentPipelineStats | null {
@@ -23,11 +16,30 @@ function latestStats(events: AgentTraceEvent[]): AgentPipelineStats | null {
   return null
 }
 
-function TimelineRow({ event, last }: { event: AgentTraceEvent; last: boolean }): ReactElement {
+function TimelineRow({
+  event,
+  last,
+  active,
+}: {
+  event: AgentTraceEvent
+  last: boolean
+  active: boolean
+}): ReactElement {
   const time = event.at.slice(11, 19) // HH:MM:SS
   // Per-email pipeline rows carry the scanned email's Gmail link — make the
   // label clickable so you can open the email straight from the history.
   const url = event.stats?.current?.url ?? null
+  // The verdict is the whole point of a per-email row, but it lives at the END
+  // of the label — where a long subject truncated it away, leaving no way to
+  // tell an accepted email from a rejected one. Pin it so it never truncates.
+  const verdict =
+    event.jobs === undefined
+      ? null
+      : event.jobs.length > 0
+        ? `${event.jobs.length} job(s)`
+        : 'no jobs'
+  const subject =
+    verdict === null ? event.label : event.label.replace(/\s*·\s*(?:\d+ job\(s\)|no jobs)$/, '')
   // Pipeline steps are the noisy per-email rows — dim them a touch so the
   // sync/mailbox/llm checkpoints stay more prominent.
   const labelClass = cn(
@@ -35,31 +47,48 @@ function TimelineRow({ event, last }: { event: AgentTraceEvent; last: boolean })
     event.channel === 'pipeline' && 'text-foreground-muted',
   )
   return (
-    <li className="relative flex items-baseline gap-2.5 pb-3">
+    <li className="relative flex items-start gap-2.5 pb-3">
       {/* Connector to the next checkpoint (not on the last). */}
       {!last ? (
         <span className="absolute bottom-0 left-[3.5px] top-3 w-px bg-border-muted" aria-hidden />
       ) : null}
-      <span
-        className={cn('size-2 shrink-0 self-center rounded-full', dotColor(event))}
-        aria-hidden
-      />
-      <span className="shrink-0 text-[0.65rem] tabular-nums text-foreground-subtle">{time}</span>
-      {url !== null ? (
-        <a
-          href={url}
-          target="_blank"
-          rel="noreferrer"
-          className={cn(labelClass, 'transition-colors hover:text-primary')}
-          title={`Open in Gmail: ${event.label}`}
-        >
-          {event.label}
-        </a>
-      ) : (
-        <span className={labelClass} title={event.label}>
-          {event.label}
-        </span>
-      )}
+      <TraceDot event={event} active={active} className="mt-1" />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-2.5">
+          <span className="shrink-0 text-[0.65rem] tabular-nums text-foreground-subtle">
+            {time}
+          </span>
+          {url !== null ? (
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className={cn(labelClass, 'transition-colors hover:text-primary')}
+              title={`Open in Gmail: ${event.label}`}
+            >
+              {subject}
+            </a>
+          ) : (
+            <span className={labelClass} title={event.label}>
+              {subject}
+            </span>
+          )}
+          {verdict !== null ? (
+            <span
+              className={cn(
+                'shrink-0 text-[0.65rem] font-medium',
+                event.jobs !== undefined && event.jobs.length > 0
+                  ? 'text-success'
+                  : 'text-foreground-ghost',
+              )}
+            >
+              {verdict}
+            </span>
+          ) : null}
+        </div>
+        {/* What this email actually produced — the agent's work, auditable. */}
+        {event.jobs !== undefined ? <TraceJobs jobs={event.jobs} /> : null}
+      </div>
     </li>
   )
 }
@@ -68,7 +97,15 @@ function TimelineRow({ event, last }: { event: AgentTraceEvent; last: boolean })
 // is collapsed by default; click the header to read the full text. This is how
 // you inspect a scanned email: expand its Response to see exactly what the model
 // proposed and why the harness kept (or dropped) it.
-function ExpandableRow({ event, last }: { event: AgentTraceEvent; last: boolean }): ReactElement {
+function ExpandableRow({
+  event,
+  last,
+  active,
+}: {
+  event: AgentTraceEvent
+  last: boolean
+  active: boolean
+}): ReactElement {
   const [open, setOpen] = useState(false)
   const time = event.at.slice(11, 19)
   const isThinking = event.channel === 'thinking'
@@ -77,7 +114,7 @@ function ExpandableRow({ event, last }: { event: AgentTraceEvent; last: boolean 
       {!last ? (
         <span className="absolute bottom-0 left-[3.5px] top-3 w-px bg-border-muted" aria-hidden />
       ) : null}
-      <span className={cn('mt-1 size-2 shrink-0 rounded-full', dotColor(event))} aria-hidden />
+      <TraceDot event={event} active={active} className="mt-1" />
       <div className="min-w-0 flex-1">
         <button
           type="button"
@@ -113,6 +150,12 @@ function ExpandableRow({ event, last }: { event: AgentTraceEvent; last: boolean 
 
 export interface AgentTimelineProps {
   onClose: () => void
+  /**
+   * Begins a run. Comes from the shared sync controls rather than a local
+   * mutation, so a run started here reports its summary the same way as
+   * anywhere else.
+   */
+  onStart: () => void
   // Resizable width in px (the left-edge handle lives in RootLayout, which owns
   // the divider — so this panel carries no left border).
   width?: number
@@ -122,11 +165,12 @@ export interface AgentTimelineProps {
 // the agent's checkpoints — sync steps, inbox reads, and each LLM call with its
 // prompt/response — each with a status dot. Its header uses the chrome tone +
 // full-strength borders (§visual-hierarchy).
-export function AgentTimeline({ onClose, width = 320 }: AgentTimelineProps): ReactElement {
+export function AgentTimeline({ onClose, onStart, width = 320 }: AgentTimelineProps): ReactElement {
   const trace = useAgentTrace()
   const stop = useStopAgent()
   const pause = usePauseAgent()
   const resume = useResumeAgent()
+  const state = useAgentState().data ?? 'idle'
   const events = trace.data ?? []
   const stats = latestStats(events)
 
@@ -137,11 +181,19 @@ export function AgentTimeline({ onClose, width = 320 }: AgentTimelineProps): Rea
       <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border bg-surface-hover px-3">
         <Activity className="size-4" />
         <span className="text-sm font-semibold">Agent activity</span>
+        {/* The one place a run begins — the agent's own panel. Hidden outright
+            while a run is active, where the transport below owns the controls,
+            so there is never a second way to kick a run off. */}
+        {state === 'idle' ? (
+          <Button size="sm" className="ml-auto h-6 gap-1 px-2 text-xs" onClick={onStart}>
+            <Play className="size-3" /> Start
+          </Button>
+        ) : null}
         <Button
           variant="ghost"
           size="icon-sm"
           aria-label="Close activity"
-          className="ml-auto"
+          className={cn(state === 'idle' ? 'ml-1' : 'ml-auto')}
           onClick={onClose}
         >
           <X />
@@ -150,6 +202,7 @@ export function AgentTimeline({ onClose, width = 320 }: AgentTimelineProps): Rea
       {stats !== null ? (
         <PipelineFunnel
           stats={stats}
+          state={state}
           onStop={() => stop.mutate()}
           onPause={() => pause.mutate()}
           onResume={() => resume.mutate()}
@@ -159,23 +212,30 @@ export function AgentTimeline({ onClose, width = 320 }: AgentTimelineProps): Rea
         <div className="p-3">
           {events.length === 0 ? (
             <p className="text-xs text-foreground-muted">
-              Nothing yet. Hit “Sync now” — each scanned email lands here; click a prompt or
+              Nothing yet. Hit Start above — each scanned email lands here; click a prompt or
               response row to read exactly what the model saw and returned.
             </p>
           ) : (
-            <ol>
-              {events.map((event, index) => {
-                const last = index === events.length - 1
-                // Rows with a body (prompt/response/reasoning) are expandable so
-                // you can read what each scanned email produced.
-                const hasBody = typeof event.body === 'string' && event.body.trim() !== ''
-                return hasBody ? (
-                  <ExpandableRow key={event.seq} event={event} last={last} />
-                ) : (
-                  <TimelineRow key={event.seq} event={event} last={last} />
-                )
-              })}
-            </ol>
+            <>
+              <TraceLegend />
+              <ol>
+                {events.map((event, index) => {
+                  const last = index === events.length - 1
+                  // The newest checkpoint is what the agent is working on, but
+                  // only while it genuinely is: a held run spins nothing, and a
+                  // pause still winding down does.
+                  const active = last && (state === 'running' || state === 'pausing')
+                  // Rows with a body (prompt/response/reasoning) are expandable so
+                  // you can read what each scanned email produced.
+                  const hasBody = typeof event.body === 'string' && event.body.trim() !== ''
+                  return hasBody ? (
+                    <ExpandableRow key={event.seq} event={event} last={last} active={active} />
+                  ) : (
+                    <TimelineRow key={event.seq} event={event} last={last} active={active} />
+                  )
+                })}
+              </ol>
+            </>
           )}
         </div>
       </ScrollArea>

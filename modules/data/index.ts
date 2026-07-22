@@ -18,7 +18,9 @@ export type {
 } from '@sources/shared'
 export type {
   AgentPipelineStats,
+  AgentState,
   AgentTraceEvent,
+  AgentTraceJob,
   AppSettings,
   MailboxAccountInfo,
   ModelChoice,
@@ -85,6 +87,7 @@ export {
 } from './mutations/sources'
 export { useSyncNow } from './mutations/sync'
 export { useSetTheme } from './mutations/theme'
+export { useAgentState } from './queries/agent'
 export { useFeed, useJob } from './queries/jobs'
 export {
   DEFAULT_PANEL_WIDTHS,

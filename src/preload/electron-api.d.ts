@@ -132,6 +132,21 @@ export interface AgentPipelineStats {
   current: { subject: string; sender: string; url: string | null } | null
 }
 
+// Mirrors src/main/sync.ts — the agent's transport state. 'pausing' is a pause
+// that has been requested but not yet reached its checkpoint: the scan holds
+// only between emails, so a local model mid-generation can take minutes to get
+// there, and the controls must say so rather than looking inert.
+export type AgentState = 'idle' | 'running' | 'pausing' | 'paused'
+
+// Mirrors modules/sources/main/types.ts — a job the agent ingested from one
+// email, so the panel can show WHICH jobs an email yielded, not just how many.
+export interface AgentTraceJob {
+  id: string
+  title: string
+  company: string
+  url: string
+}
+
 // Mirrors src/main/sync.ts — one line in the agent's live activity trace.
 export interface AgentTraceEvent {
   seq: number
@@ -141,6 +156,7 @@ export interface AgentTraceEvent {
   body?: string
   chars?: number
   stats?: AgentPipelineStats
+  jobs?: AgentTraceJob[]
 }
 
 // Mirrors modules/persistence/main/repositories/sync-runs.ts.
@@ -217,6 +233,10 @@ export interface ElectronAPI {
   }
   readonly agent: {
     readonly onTrace: (callback: (event: AgentTraceEvent) => void) => () => void
+    // Transport state pushes — mirrors src/main/sync.ts.
+    readonly onStateChange: (callback: (state: AgentState) => void) => () => void
+    // Current transport state, read once on mount; changes arrive over onStateChange.
+    readonly state: () => Promise<IpcResult<AgentState>>
     // Interrupt the running pass; resolves true if a run was actually aborted.
     readonly stop: () => Promise<IpcResult<boolean>>
     // Hold / resume the running scan between emails.

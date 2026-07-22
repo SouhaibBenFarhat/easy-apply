@@ -44,6 +44,17 @@ export interface AgentPipelineStats {
   current: { subject: string; sender: string; url: string | null } | null
 }
 
+// A job the agent actually ingested from one email, small enough to ride along
+// on a trace event. This is the audit trail: a count says "2 jobs", this says
+// WHICH two, so a wrong extraction is visible instead of silently trusted.
+// Mirrored in src/preload/electron-api.d.ts.
+export interface AgentTraceJob {
+  id: string
+  title: string
+  company: string
+  url: string // the posting, opened externally through the window guards
+}
+
 // One line in the agent's live activity trace (surfaced in the header panel).
 // seq/at are stamped by the broadcaster; callers supply the rest.
 export interface AgentTraceInput {
@@ -52,6 +63,7 @@ export interface AgentTraceInput {
   body?: string // the full prompt/response/reasoning text
   chars?: number // context load (prompt/response size)
   stats?: AgentPipelineStats // funnel counts, on 'pipeline' events
+  jobs?: AgentTraceJob[] // what an email yielded, on its verdict event
 }
 
 export type TraceFn = (event: AgentTraceInput) => void

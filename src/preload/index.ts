@@ -75,6 +75,14 @@ const api = {
         ipcRenderer.removeListener('agent:trace', listener)
       }
     },
+    onStateChange: (callback: (state: unknown) => void) => {
+      const listener = (_event: IpcRendererEvent, payload: unknown): void => callback(payload)
+      ipcRenderer.on('agent:state-changed', listener)
+      return () => {
+        ipcRenderer.removeListener('agent:state-changed', listener)
+      }
+    },
+    state: () => ipcRenderer.invoke('agent:state'),
     stop: () => ipcRenderer.invoke('agent:stop'),
     pause: () => ipcRenderer.invoke('agent:pause'),
     resume: () => ipcRenderer.invoke('agent:resume'),

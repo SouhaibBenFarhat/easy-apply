@@ -1,6 +1,6 @@
-import type { AgentPipelineStats } from '@data'
-import { Button, cn } from '@ui-kit'
-import { Mail, Pause, Play, Square } from 'lucide-react'
+import type { AgentPipelineStats, AgentState } from '@data'
+import { cn, TransportControl } from '@ui-kit'
+import { Mail } from 'lucide-react'
 import type { ReactElement } from 'react'
 
 function StatChip({
@@ -23,9 +23,19 @@ function StatChip({
 
 export interface PipelineFunnelProps {
   stats: AgentPipelineStats
-  onStop?: () => void
-  onPause?: () => void
-  onResume?: () => void
+  /** Authoritative transport state from the main process. */
+  state: AgentState
+  onStop: () => void
+  onPause: () => void
+  onResume: () => void
+}
+
+// The chip beside the PIPELINE label — the run's own status, in words.
+const STATE_LABEL: Record<AgentState, string | null> = {
+  idle: null,
+  running: null,
+  pausing: 'pausing…',
+  paused: 'paused',
 }
 
 // The email→job funnel for the agent monitor: a live progress bar over emails
@@ -36,15 +46,18 @@ export interface PipelineFunnelProps {
 // (slow) scan.
 export function PipelineFunnel({
   stats,
+  state,
   onStop,
   onPause,
   onResume,
 }: PipelineFunnelProps): ReactElement {
   const pct =
     stats.emailsTotal === 0 ? 0 : Math.round((stats.emailsProcessed / stats.emailsTotal) * 100)
-  // A stopped run also has processed < total, so `done` (not the count) decides
-  // whether it's still running — otherwise the Stop button never goes away.
-  const running = !stats.done
+  // The transport state is authoritative — the funnel's own `done` flag lags a
+  // stopped run and says nothing at all about a pause that is still winding
+  // down, which is what made the old controls unreadable.
+  const active = state !== 'idle'
+  const stateLabel = STATE_LABEL[state]
 
   return (
     <div className="shrink-0 px-3 pt-3">
@@ -56,47 +69,18 @@ export function PipelineFunnel({
               capped
             </span>
           ) : null}
-          {stats.paused ? (
+          {stateLabel !== null ? (
             <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-warning">
-              paused
+              {stateLabel}
             </span>
           ) : null}
           <span className="ml-auto text-xs tabular-nums text-foreground-subtle">
             {stats.emailsProcessed} / {stats.emailsTotal}
           </span>
-          {running ? (
-            <div className="flex items-center gap-1">
-              {stats.paused
-                ? onResume !== undefined && (
-                    <Button
-                      size="icon-sm"
-                      variant="secondary"
-                      aria-label="Resume"
-                      onClick={onResume}
-                    >
-                      <Play />
-                    </Button>
-                  )
-                : onPause !== undefined && (
-                    <Button size="icon-sm" variant="ghost" aria-label="Pause" onClick={onPause}>
-                      <Pause />
-                    </Button>
-                  )}
-              {onStop !== undefined ? (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="h-6 gap-1 px-2 text-xs"
-                  onClick={onStop}
-                >
-                  <Square className="size-3" /> Stop
-                </Button>
-              ) : null}
-            </div>
-          ) : null}
+          <TransportControl state={state} onPause={onPause} onResume={onResume} onStop={onStop} />
         </div>
-        {/* Progress groove — info while running, warning while held (paused),
-            success when finished (copper stays scarce). */}
+        {/* Progress groove — info while running, warning while held or winding
+            down, success when finished (copper stays scarce). */}
         <div
           className="h-1.5 overflow-hidden rounded-full bg-background"
           role="progressbar"
@@ -108,7 +92,7 @@ export function PipelineFunnel({
           <div
             className={cn(
               'h-full rounded-full transition-[width]',
-              running ? (stats.paused ? 'bg-warning' : 'bg-info') : 'bg-success',
+              !active ? 'bg-success' : state === 'running' ? 'bg-info' : 'bg-warning',
             )}
             style={{ width: `${pct}%` }}
           />

@@ -1,79 +1,55 @@
+import type { ThemeVariant } from '@data'
 import { render, screen, userEvent } from '@test-utils'
+import type { ReactNode } from 'react'
 import { AppHeader } from './AppHeader'
 
 const NOOP = (): void => {}
 
+function renderHeader(
+  props: { theme?: ThemeVariant; onCycleTheme?: () => void; children?: ReactNode } = {},
+): ReturnType<typeof render> {
+  const { theme = 'dark', onCycleTheme = NOOP, children } = props
+  return render(
+    <AppHeader title="Feed" theme={theme} onCycleTheme={onCycleTheme}>
+      {children}
+    </AppHeader>,
+  )
+}
+
 describe('AppHeader', () => {
   it('renders the page title as a heading on a glass draggable bar', () => {
-    render(
-      <AppHeader title="Feed" syncing={false} onSyncNow={NOOP} theme="dark" onCycleTheme={NOOP} />,
-    )
+    renderHeader()
     expect(screen.getByRole('heading', { level: 1, name: 'Feed' })).toBeInTheDocument()
     expect(screen.getByRole('banner')).toHaveClass('glass', 'app-drag')
   })
 
-  it('spins the sync icon only while syncing', () => {
-    const { rerender } = render(
-      <AppHeader title="Feed" syncing={false} onSyncNow={NOOP} theme="dark" onCycleTheme={NOOP} />,
-    )
-    const icon = (): SVGElement | null =>
-      screen.getByRole('button', { name: 'Sync now' }).querySelector('svg')
-    expect(icon()).not.toHaveClass('animate-spin-slow')
-
-    rerender(<AppHeader title="Feed" syncing onSyncNow={NOOP} theme="dark" onCycleTheme={NOOP} />)
-    expect(icon()).toHaveClass('animate-spin-slow')
-  })
-
-  it('fires onSyncNow and onCycleTheme from the action buttons', async () => {
-    const onSyncNow = vi.fn()
+  it('cycles the theme from the toggle', async () => {
     const onCycleTheme = vi.fn()
-    const user = userEvent.setup()
-    render(
-      <AppHeader
-        title="Feed"
-        syncing={false}
-        onSyncNow={onSyncNow}
-        theme="dark"
-        onCycleTheme={onCycleTheme}
-      />,
-    )
-    await user.click(screen.getByRole('button', { name: 'Sync now' }))
-    expect(onSyncNow).toHaveBeenCalledTimes(1)
-    await user.click(screen.getByRole('button', { name: 'Toggle theme' }))
+    renderHeader({ onCycleTheme })
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Toggle theme' }))
     expect(onCycleTheme).toHaveBeenCalledTimes(1)
   })
 
   it('shows the icon matching the active theme variant', () => {
-    const { rerender } = render(
-      <AppHeader title="Feed" syncing={false} onSyncNow={NOOP} theme="dark" onCycleTheme={NOOP} />,
-    )
     const icon = (): SVGElement | null =>
       screen.getByRole('button', { name: 'Toggle theme' }).querySelector('svg')
+
+    const dark = renderHeader({ theme: 'dark' })
     expect(icon()).toHaveClass('lucide-moon')
+    dark.unmount()
 
-    rerender(
-      <AppHeader title="Feed" syncing={false} onSyncNow={NOOP} theme="light" onCycleTheme={NOOP} />,
-    )
+    const light = renderHeader({ theme: 'light' })
     expect(icon()).toHaveClass('lucide-sun')
+    light.unmount()
 
-    rerender(
-      <AppHeader
-        title="Feed"
-        syncing={false}
-        onSyncNow={NOOP}
-        theme="system"
-        onCycleTheme={NOOP}
-      />,
-    )
+    renderHeader({ theme: 'system' })
     expect(icon()).toHaveClass('lucide-monitor')
   })
 
+  // The agent transport arrives as a child from @app, which decides whether the
+  // header or the pipeline panel shows it — never both.
   it('renders extra actions in the no-drag cluster', () => {
-    render(
-      <AppHeader title="Feed" syncing={false} onSyncNow={NOOP} theme="dark" onCycleTheme={NOOP}>
-        <button type="button">Filter</button>
-      </AppHeader>,
-    )
+    renderHeader({ children: <button type="button">Filter</button> })
     const extra = screen.getByRole('button', { name: 'Filter' })
     expect(extra.closest('.app-no-drag')).not.toBeNull()
   })

@@ -68,13 +68,16 @@ describe('App', () => {
     expect(await screen.findByDisplayValue('München')).toBeInTheDocument()
   })
 
-  it('the header sync button triggers window.electron.sync.now', async () => {
+  // Runs begin from Start in the agent activity panel — the app's single launch
+  // point; the header carries pause/stop only.
+  it('the activity panel Start button triggers window.electron.sync.now', async () => {
     const now = vi.spyOn(window.electron.sync, 'now')
     const user = userEvent.setup()
     render(<App />)
     await screen.findByText('No jobs yet')
 
-    await user.click(screen.getByRole('button', { name: 'Sync now' }))
+    await user.click(screen.getByRole('button', { name: 'Agent activity' }))
+    await user.click(screen.getByRole('button', { name: 'Start' }))
     await waitFor(() => expect(now).toHaveBeenCalledTimes(1))
     expect(await screen.findByText('Sync complete')).toBeInTheDocument()
   })

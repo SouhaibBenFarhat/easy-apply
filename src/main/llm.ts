@@ -13,7 +13,12 @@ import { getLlama, type Llama, LlamaChatSession, type LlamaModel } from 'node-ll
 // just a shorter working window). With mmap'd weights, the 8B model then sits
 // around ~6 GB. This bounds the *context*, not the weights — a 14B's weights
 // alone exceed 6 GB, so it inherently needs more.
-const CONTEXT_SIZE = 4096
+// 8192, not 4096: a 10k-char German digest is ~3.5–4.5k tokens once tracking
+// URLs are counted, and 25 extracted jobs can be another 1.5–3k of JSON output
+// — which overflowed 4096 and truncated the answer into unparseable JSON.
+// Costs ~0.5 GB more KV cache on the 8B (~0.75 GB on the 14B); weights are
+// untouched, and it's all freed on dispose().
+const CONTEXT_SIZE = 8192
 
 export interface DisposableLlm extends LlmClient {
   dispose(): Promise<void>

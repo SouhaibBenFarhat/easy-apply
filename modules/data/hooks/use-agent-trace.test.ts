@@ -37,4 +37,48 @@ describe('useAgentTrace', () => {
     await waitFor(() => expect(result.current.data).toHaveLength(2))
     expect(result.current.data?.map((event) => event.label)).toEqual(['Sync started', 'Prompt'])
   })
+
+  // The mailbox agent upserts each email's jobs as it goes, so the feed has to
+  // re-read mid-run. Waiting for sync:completed left it looking empty for the
+  // whole (hour-long) scan.
+  it('re-reads the feed as soon as new jobs are kept', async () => {
+    const mock = setupMockElectron()
+    const emit = createAgentTraceEmitter(mock)
+    const client = createTestQueryClient()
+    const invalidate = vi.spyOn(client, 'invalidateQueries')
+    renderHook(() => useAgentTraceCollector(), { client })
+
+    const pipelineEvent = (seq: number, jobsKept: number): Parameters<typeof emit>[0] => ({
+      seq,
+      at: '2026-07-21T09:00:00.000Z',
+      channel: 'pipeline',
+      label: `Subject ${seq}`,
+      stats: {
+        emailsTotal: 10,
+        emailsProcessed: seq,
+        emailsAccepted: jobsKept,
+        emailsRejected: 0,
+        jobsProposed: jobsKept,
+        jobsKept,
+        capped: false,
+        done: false,
+        paused: false,
+        current: null,
+      },
+    })
+
+    // No jobs yet → nothing to re-read.
+    act(() => emit(pipelineEvent(1, 0)))
+    await waitFor(() => expect(invalidate).not.toHaveBeenCalled())
+
+    act(() => emit(pipelineEvent(2, 2)))
+    await waitFor(() =>
+      expect(invalidate).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ['jobs'] })),
+    )
+
+    // A steady count is not new work — no repeat invalidation.
+    invalidate.mockClear()
+    act(() => emit(pipelineEvent(3, 2)))
+    await waitFor(() => expect(invalidate).not.toHaveBeenCalled())
+  })
 })

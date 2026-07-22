@@ -24,6 +24,7 @@ export interface QueryKeys {
   }
   readonly agent: {
     readonly trace: readonly ['agent', 'trace']
+    readonly state: readonly ['agent', 'state']
   }
   readonly settings: {
     readonly app: readonly ['settings', 'app']
@@ -56,6 +57,7 @@ export const keys: QueryKeys = {
   },
   agent: {
     trace: ['agent', 'trace'],
+    state: ['agent', 'state'],
   },
   settings: {
     app: ['settings', 'app'],

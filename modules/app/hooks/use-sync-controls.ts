@@ -1,18 +1,28 @@
-import { useSyncNow, useSyncStatus } from '@data'
+import type { AgentState } from '@data'
+import { useAgentState, usePauseAgent, useResumeAgent, useStopAgent, useSyncNow } from '@data'
 import { useToast } from '@ui-kit'
 import { useCallback } from 'react'
 import { formatSyncToast } from '../format-sync-toast'
 
 export interface SyncControls {
-  syncing: boolean
+  /** Authoritative transport state from the main process. */
+  state: AgentState
   onSyncNow: () => void
+  onPause: () => void
+  onResume: () => void
+  onStop: () => void
 }
 
-// Header sync state: spinning while a pass runs — whether this window
-// triggered it (mutation pending) or the scheduler did (status.running).
+// The header's transport surface, mirroring the pipeline panel's. State comes
+// from main rather than being inferred from `sync:status.running`: a held pass
+// is still "running" by that measure, which is exactly why the old spinner kept
+// turning after a pause.
 export function useSyncControls(): SyncControls {
-  const status = useSyncStatus()
+  const state = useAgentState().data ?? 'idle'
   const { mutate, isPending } = useSyncNow()
+  const pause = usePauseAgent()
+  const resume = useResumeAgent()
+  const stop = useStopAgent()
   const { toast } = useToast()
 
   const onSyncNow = useCallback(() => {
@@ -27,8 +37,9 @@ export function useSyncControls(): SyncControls {
     })
   }, [isPending, mutate, toast])
 
-  return {
-    syncing: (status.data?.running ?? false) || isPending,
-    onSyncNow,
-  }
+  const onPause = useCallback(() => pause.mutate(), [pause.mutate])
+  const onResume = useCallback(() => resume.mutate(), [resume.mutate])
+  const onStop = useCallback(() => stop.mutate(), [stop.mutate])
+
+  return { state, onSyncNow, onPause, onResume, onStop }
 }

@@ -1,6 +1,7 @@
 import type { FeedFilters, StoredJob } from '@sources/shared'
 import { DEFAULT_SEARCH_PROFILE, isAgentSource } from '@sources/shared'
 import type {
+  AgentState,
   AgentTraceEvent,
   AppSettings,
   ElectronAPI,
@@ -25,6 +26,7 @@ export interface MockElectronSeed {
   sources?: SourceInfo[]
   mailboxAccounts?: string[]
   modelStatus?: ModelStatus
+  agentState?: AgentState
 }
 
 const DEFAULT_MODEL_STATUS: ModelStatus = {
@@ -214,6 +216,22 @@ export function createAgentTraceEmitter(mock: ElectronAPI): (event: AgentTraceEv
   }
 }
 
+// agent.onStateChange subscribers, keyed like the trace listeners above.
+const stateListenersByNamespace = new WeakMap<
+  ElectronAPI['agent'],
+  Set<(state: AgentState) => void>
+>()
+
+// Drives the mock's agent.onStateChange subscribers — the stand-in for
+// webContents.send('agent:state-changed', …).
+export function createAgentStateEmitter(mock: ElectronAPI): (state: AgentState) => void {
+  return (state: AgentState): void => {
+    const listeners = stateListenersByNamespace.get(mock.agent)
+    if (listeners === undefined) return
+    for (const listener of [...listeners]) listener(state)
+  }
+}
+
 // model.onProgress subscribers, keyed like the sync emitter above.
 const modelListenersByNamespace = new WeakMap<
   ElectronAPI['model'],
@@ -313,6 +331,8 @@ export function createMockElectron(seed: MockElectronSeed = {}): ElectronAPI {
   syncListenersByNamespace.set(sync, syncListeners)
 
   const traceListeners = new Set<(event: AgentTraceEvent) => void>()
+  const stateListeners = new Set<(state: AgentState) => void>()
+  const agentState: AgentState = seed.agentState ?? 'idle'
   const agent: ElectronAPI['agent'] = {
     onTrace: (callback) => {
       traceListeners.add(callback)
@@ -320,11 +340,19 @@ export function createMockElectron(seed: MockElectronSeed = {}): ElectronAPI {
         traceListeners.delete(callback)
       }
     },
+    onStateChange: (callback) => {
+      stateListeners.add(callback)
+      return () => {
+        stateListeners.delete(callback)
+      }
+    },
+    state: async () => ({ success: true, data: agentState }),
     stop: async () => ({ success: true, data: false }),
     pause: async () => ({ success: true, data: false }),
     resume: async () => ({ success: true, data: false }),
   }
   traceListenersByNamespace.set(agent, traceListeners)
+  stateListenersByNamespace.set(agent, stateListeners)
 
   return {
     platform: 'darwin',
