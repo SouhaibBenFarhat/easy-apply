@@ -88,7 +88,7 @@ const SVG = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http
   <polygon points="98,58 62,76 79,81" fill="${COPPER}"/>
   <polygon points="98,58 79,81 74,94" fill="#a06a38"/>
 
-  <text x="130" y="74" font-family="${SERIF}" font-size="30" font-weight="600" fill="${TEXT}">EasyApply</text>
+  <text x="130" y="74" font-family="${SERIF}" font-size="30" font-weight="600" fill="${TEXT}">EA</text>
   <text x="130" y="99" font-family="${SANS}" font-size="17" fill="${MUTED}">An AI agent that reads your job alerts — on your own Mac.</text>
 
   <rect x="856" y="50" width="292" height="34" rx="17" fill="rgba(200,137,78,0.12)" stroke="${COPPER}" stroke-opacity="0.5"/>
