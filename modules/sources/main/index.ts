@@ -51,6 +51,7 @@ export { type SplitThinking, splitThinking } from './thinking'
 export type {
   AgentPipelineStats,
   AgentTraceInput,
+  AgentTraceJob,
   FetchContext,
   JobSourceProvider,
   ProcessedMessages,

@@ -227,11 +227,20 @@ export const mailboxProvider: JobSourceProvider = {
       }
       // Remember it so future syncs skip it — scanned once, accepted or not.
       if (message.messageId !== null) seen?.add(message.messageId)
-      emitStats(
-        ctx.trace,
-        `${clip(message.subject)} · ${extracted.length > 0 ? `${extracted.length} job(s)` : 'no jobs'}`,
-        stats,
-      )
+      // The verdict event carries the jobs themselves, not just a count, so the
+      // monitor can show exactly what this email produced and you can check the
+      // agent's judgement against the real posting.
+      ctx.trace?.({
+        channel: 'pipeline',
+        label: `${clip(message.subject)} · ${extracted.length > 0 ? `${extracted.length} job(s)` : 'no jobs'}`,
+        stats: { ...stats },
+        jobs: extracted.map((job) => ({
+          id: job.id,
+          title: job.title,
+          company: job.company,
+          url: job.applyUrl ?? job.url,
+        })),
+      })
     }
 
     stats.current = null

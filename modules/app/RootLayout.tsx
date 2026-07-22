@@ -3,7 +3,7 @@ import { useAgentTraceCollector, useResizablePanel, useSetTheme, useTheme } from
 import type { SidebarNavItem } from '@shell'
 import { AppHeader, Sidebar } from '@shell'
 import { Outlet, useRouter, useRouterState } from '@tanstack/react-router'
-import { ResizeHandle, Toaster, TooltipProvider } from '@ui-kit'
+import { ResizeHandle, Toaster, TooltipProvider, TransportControl } from '@ui-kit'
 import { ClipboardList, Plug, Rss, Settings } from 'lucide-react'
 import { type ReactElement, useState } from 'react'
 import { AgentMonitorButton } from './AgentMonitorButton'
@@ -34,7 +34,7 @@ export function RootLayout(): ReactElement {
   })
   const theme = useTheme().data ?? 'dark'
   const setTheme = useSetTheme()
-  const { syncing, onSyncNow } = useSyncControls()
+  const transport = useSyncControls()
   const [monitorOpen, setMonitorOpen] = useState(false)
   const activityPanel = useResizablePanel('activity', { min: 260, max: 520, grows: 'left' })
   useAgentTraceCollector() // stream agent:trace events into the cache
@@ -53,11 +53,23 @@ export function RootLayout(): ReactElement {
         <main className="flex min-w-0 flex-1 flex-col">
           <AppHeader
             title={title}
-            syncing={syncing}
-            onSyncNow={onSyncNow}
             theme={theme}
             onCycleTheme={() => setTheme.mutate(NEXT_THEME[theme])}
           >
+            {/* Exactly one transport on screen: the pipeline panel owns it
+                whenever it's open (it sits with the progress and counts it
+                controls), and the header carries it only while that panel is
+                closed. Two identical clusters is not a mirror, it's a
+                duplicate. */}
+            {monitorOpen ? null : (
+              <TransportControl
+                compact
+                state={transport.state}
+                onPause={transport.onPause}
+                onResume={transport.onResume}
+                onStop={transport.onStop}
+              />
+            )}
             <AiToggle />
             <AgentMonitorButton
               open={monitorOpen}
@@ -82,7 +94,11 @@ export function RootLayout(): ReactElement {
                   onResize={activityPanel.onResize}
                   onResizeEnd={activityPanel.onResizeEnd}
                 />
-                <AgentTimeline width={activityPanel.width} onClose={() => setMonitorOpen(false)} />
+                <AgentTimeline
+                  width={activityPanel.width}
+                  onStart={transport.onSyncNow}
+                  onClose={() => setMonitorOpen(false)}
+                />
               </>
             ) : null}
           </div>

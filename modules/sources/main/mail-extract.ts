@@ -46,9 +46,10 @@ function sourceFromUrl(url: string): SourceId {
 }
 
 // Once the CSS/script noise is stripped, a job digest's real text is small, so
-// this comfortably holds a large "see all jobs" digest. Kept within the 4096
-// context window (~10k chars ≈ ~3k tokens, leaving room for instructions +
-// output); raise the model context too if you raise this much further.
+// this comfortably holds a large "see all jobs" digest. Sized against the 8192
+// context window (src/main/llm.ts): ~10k chars is ~3.5–4.5k tokens once
+// tracking URLs are counted, leaving real room for instructions + up to 25
+// jobs of JSON output; raise the model context too if you raise this further.
 const MAX_EMAIL_CHARS = 10_000
 const MAX_JOBS_PER_EMAIL = 25
 

@@ -23,6 +23,14 @@ export interface SyncStatus {
   recentRuns: SyncRun[]
 }
 
+// The agent's transport state — what the play/pause/stop controls render from.
+// 'pausing' is the state that used to be invisible: the pause is requested, but
+// the scan only holds BETWEEN emails, so a local model mid-generation can take
+// minutes to reach the checkpoint. Without it the UI looked broken — the click
+// did nothing observable until the in-flight email finished.
+// Mirrored in src/preload/electron-api.d.ts.
+export type AgentState = 'idle' | 'running' | 'pausing' | 'paused'
+
 const FIRST_SYNC_DELAY_MS = 5_000
 // The scheduler wakes every 30 min and only runs a pass once the configured
 // syncIntervalHours has elapsed since the last completed one.
@@ -58,10 +66,28 @@ export function installSync(db: AppDatabase, modelManager: ModelManager): () => 
     for (const window of BrowserWindow.getAllWindows()) window.webContents.send('sync:event', event)
   }
 
+  // Authoritative transport state. The renderer never derives this from timing
+  // guesses — main knows when a pass starts, when a pause is merely REQUESTED,
+  // and when the scan actually reached its checkpoint and held.
+  let agentState: AgentState = 'idle'
+  const setAgentState = (next: AgentState): void => {
+    if (agentState === next) return
+    agentState = next
+    for (const window of BrowserWindow.getAllWindows())
+      window.webContents.send('agent:state-changed', next)
+  }
+
   // Live agent-activity trace for the header monitor: stamp seq/at and push to
   // every window over 'agent:trace'.
   let traceSeq = 0
   const traceEmit = (input: AgentTraceInput): void => {
+    // A funnel snapshot is the provider ACKNOWLEDGING the hold: it flips
+    // stats.paused at the checkpoint, which is the only moment 'pausing' can
+    // honestly become 'paused' (and the moment a resume takes effect).
+    if (input.stats !== undefined && agentState !== 'idle') {
+      if (input.stats.paused) setAgentState('paused')
+      else if (agentState === 'paused') setAgentState('running')
+    }
     const event = { seq: traceSeq++, at: new Date().toISOString(), ...input }
     for (const window of BrowserWindow.getAllWindows())
       window.webContents.send('agent:trace', event)
@@ -105,6 +131,7 @@ export function installSync(db: AppDatabase, modelManager: ModelManager): () => 
     // A fresh pass never starts paused; clear any stale waiters.
     paused = false
     releaseResume()
+    setAgentState('running')
     // Scanned-mail memory for this pass, so the mailbox agent only LLMs new
     // mail; persisted (capped, most-recent-wins) after the pass settles.
     const seenMailIds = new Set(store.get('processedMailIds'))
@@ -168,6 +195,7 @@ export function installSync(db: AppDatabase, modelManager: ModelManager): () => 
         if (activeController === controller) activeController = null
         paused = false
         releaseResume()
+        setAgentState('idle')
       })
     return promise
   }
@@ -210,12 +238,23 @@ export function installSync(db: AppDatabase, modelManager: ModelManager): () => 
     }
   })
 
+  // Current transport state — read once on mount; live changes arrive over the
+  // 'agent:state-changed' push, so a reopened panel or reloaded window is never
+  // out of step with a pass that is already under way.
+  ipcMain.handle('agent:state', async (): Promise<IpcResult<AgentState>> => {
+    try {
+      return ok(agentState)
+    } catch (error) {
+      return fail(error)
+    }
+  })
+
   // Interrupt the running pass (the email scan). Resolves true if a pass was
   // actually aborted, false if nothing was running.
   ipcMain.handle('agent:stop', async (): Promise<IpcResult<boolean>> => {
     try {
       const wasRunning = activeController !== null
-      if (wasRunning) traceEmit({ channel: 'sync', label: 'Stop requested' })
+      if (wasRunning) traceEmit({ channel: 'sync', label: 'Stopping' })
       // Release a paused scan so it wakes, sees the abort, and exits cleanly.
       paused = false
       releaseResume()
@@ -231,7 +270,13 @@ export function installSync(db: AppDatabase, modelManager: ModelManager): () => 
     try {
       if (running === null || paused) return ok(false)
       paused = true
-      traceEmit({ channel: 'sync', label: 'Pause requested' })
+      // 'pausing', not 'paused': the scan holds only at the next checkpoint.
+      // The control flips immediately so the click is acknowledged, and the
+      // funnel snapshot promotes it to 'paused' when the hold really happens.
+      setAgentState('pausing')
+      // Say what actually happens. "Pause requested" reads like the click
+      // failed; the scan is genuinely still working until the next checkpoint.
+      traceEmit({ channel: 'sync', label: 'Pausing — holds after the current email' })
       return ok(true)
     } catch (error) {
       return fail(error)
@@ -244,7 +289,10 @@ export function installSync(db: AppDatabase, modelManager: ModelManager): () => 
       if (!paused) return ok(false)
       paused = false
       releaseResume()
-      traceEmit({ channel: 'sync', label: 'Resume requested' })
+      // Covers resuming out of 'pausing' too — a pause that hadn't yet reached
+      // its checkpoint is simply cancelled, and no snapshot ever arrives.
+      setAgentState('running')
+      traceEmit({ channel: 'sync', label: 'Resuming' })
       return ok(true)
     } catch (error) {
       return fail(error)

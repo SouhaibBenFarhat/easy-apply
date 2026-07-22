@@ -1,6 +1,6 @@
 import type { AgentTraceEvent } from '@data'
 import { keys } from '@data'
-import { createTestQueryClient, render, screen, userEvent } from '@test-utils'
+import { createTestQueryClient, render, screen, userEvent, waitFor } from '@test-utils'
 import { AgentTimeline } from './AgentTimeline'
 
 function ev(
@@ -14,8 +14,54 @@ function ev(
 
 describe('AgentTimeline', () => {
   it('shows an empty hint with no trace', () => {
-    render(<AgentTimeline onClose={vi.fn()} />)
+    render(<AgentTimeline onClose={vi.fn()} onStart={vi.fn()} />)
     expect(screen.getByText(/Nothing yet/)).toBeInTheDocument()
+  })
+
+  // The app's single launch point lives here, and only while idle — once a run
+  // is under way the transport owns the controls, so Start can never become a
+  // second way to kick one off.
+  it('starts a run while idle and hides Start once one is under way', async () => {
+    const onStart = vi.fn()
+    const client = createTestQueryClient()
+    render(<AgentTimeline onClose={vi.fn()} onStart={onStart} />, { client })
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Start' }))
+    expect(onStart).toHaveBeenCalledTimes(1)
+
+    client.setQueryData(keys.agent.state, 'running')
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Start' })).not.toBeInTheDocument(),
+    )
+  })
+
+  // Each email's verdict row carries the jobs it produced, so the agent's
+  // judgement can be checked against the real postings.
+  it('shows the jobs an email yielded under its verdict row', () => {
+    const client = createTestQueryClient()
+    client.setQueryData(keys.agent.trace, [
+      {
+        ...ev(0, 'pipeline', 'Backend roles for you · 1 job(s)'),
+        jobs: [
+          {
+            id: 'linkedin:1',
+            title: 'Senior TypeScript Engineer',
+            company: 'Petrol GmbH',
+            url: 'https://jobs.example.com/1',
+          },
+        ],
+      },
+      ev(1, 'pipeline', 'Newsletter · no jobs'),
+    ])
+    render(<AgentTimeline onClose={vi.fn()} onStart={vi.fn()} />, { client })
+
+    expect(screen.getByRole('link', { name: /Senior TypeScript Engineer/ })).toHaveAttribute(
+      'href',
+      'https://jobs.example.com/1',
+    )
+    // A rejected email contributes no rows to audit.
+    expect(screen.getByText('Newsletter · no jobs')).toBeInTheDocument()
+    expect(screen.getAllByRole('link')).toHaveLength(1)
   })
 
   it('lists every checkpoint', () => {
@@ -26,7 +72,7 @@ describe('AgentTimeline', () => {
       ev(2, 'mailbox', 'Inbox read failed'),
       ev(3, 'llm', 'Prompt · 42 chars', 'EXTRACT JOBS FROM THIS EMAIL'),
     ])
-    render(<AgentTimeline onClose={vi.fn()} />, { client })
+    render(<AgentTimeline onClose={vi.fn()} onStart={vi.fn()} />, { client })
 
     expect(screen.getByText('Sync started')).toBeInTheDocument()
     expect(screen.getByText('Found 3 alert emails')).toBeInTheDocument()
@@ -56,7 +102,7 @@ describe('AgentTimeline', () => {
         },
       },
     ])
-    render(<AgentTimeline onClose={vi.fn()} />, { client })
+    render(<AgentTimeline onClose={vi.fn()} onStart={vi.fn()} />, { client })
 
     expect(screen.getByLabelText('Pipeline')).toBeInTheDocument()
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '67')
@@ -91,7 +137,7 @@ describe('AgentTimeline', () => {
         },
       },
     ])
-    render(<AgentTimeline onClose={vi.fn()} />, { client })
+    render(<AgentTimeline onClose={vi.fn()} onStart={vi.fn()} />, { client })
 
     expect(screen.getByRole('link', { name: /Analyzing/ })).toHaveAttribute(
       'href',
@@ -106,7 +152,7 @@ describe('AgentTimeline', () => {
       ev(1, 'thinking', 'Thinking · 24 chars', 'Let me scan for postings'),
     ])
     const user = userEvent.setup()
-    render(<AgentTimeline onClose={vi.fn()} />, { client })
+    render(<AgentTimeline onClose={vi.fn()} onStart={vi.fn()} />, { client })
 
     // Collapsed: the reasoning body is hidden until the user opens it.
     expect(screen.getByRole('button', { name: /Thinking/ })).toHaveAttribute(
@@ -122,7 +168,7 @@ describe('AgentTimeline', () => {
   it('closes on the close button', async () => {
     const onClose = vi.fn()
     const user = userEvent.setup()
-    render(<AgentTimeline onClose={onClose} />)
+    render(<AgentTimeline onClose={onClose} onStart={() => {}} />)
     await user.click(screen.getByRole('button', { name: 'Close activity' }))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
