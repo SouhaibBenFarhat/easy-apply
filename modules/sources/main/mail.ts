@@ -67,3 +67,26 @@ export async function readRecentMessages(
     await driver.close()
   }
 }
+
+// imapflow throws a bare `Error('Command failed')` for EVERY IMAP NO/BAD
+// response and hangs the actual reason off the error object instead
+// (`responseText` — the server's own text, e.g. "Invalid credentials
+// (Failure)" — plus a `serverResponseCode` like AUTHENTICATIONFAILED). Reading
+// only `.message` therefore reports "Command failed" for a wrong app password,
+// a locked mailbox and a rate-limit alike. Prefer the server's text, keep the
+// code, and fall back to the message for non-IMAP failures (DNS, TLS, socket
+// timeouts), which carry a useful `.message` of their own.
+export function describeMailError(error: unknown): string {
+  if (typeof error !== 'object' || error === null) return String(error)
+  const record = error as {
+    message?: unknown
+    responseText?: unknown
+    serverResponseCode?: unknown
+  }
+  const fallback = typeof record.message === 'string' && record.message !== '' ? record.message : ''
+  const detail = typeof record.responseText === 'string' ? record.responseText.trim() : ''
+  const code = typeof record.serverResponseCode === 'string' ? record.serverResponseCode.trim() : ''
+  const reason = detail !== '' ? detail : fallback
+  if (reason === '') return code !== '' ? code : 'mail read failed'
+  return code !== '' && !reason.includes(code) ? `${reason} (${code})` : reason
+}

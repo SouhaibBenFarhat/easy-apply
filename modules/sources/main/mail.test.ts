@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { type MailDriver, type MailMessage, readRecentMessages } from './mail'
+import { describeMailError, type MailDriver, type MailMessage, readRecentMessages } from './mail'
 
 function message(uid: number, from: string): MailMessage {
   return {
@@ -68,5 +68,42 @@ describe('readRecentMessages', () => {
 
     await expect(readRecentMessages(driver, options)).rejects.toThrow('IMAP timeout')
     expect(calls).toEqual(['connect', 'search', 'close'])
+  })
+})
+
+describe('describeMailError', () => {
+  // The exact shape imapflow throws for an IMAP NO/BAD: a useless message, the
+  // real reason on responseText/serverResponseCode.
+  function imapError(responseText: string, serverResponseCode?: string): Error {
+    return Object.assign(new Error('Command failed'), { responseText, serverResponseCode })
+  }
+
+  it('prefers the server response text over the generic message', () => {
+    expect(describeMailError(imapError('Invalid credentials (Failure)'))).toBe(
+      'Invalid credentials (Failure)',
+    )
+  })
+
+  it('appends the server response code', () => {
+    expect(describeMailError(imapError('Invalid credentials', 'AUTHENTICATIONFAILED'))).toBe(
+      'Invalid credentials (AUTHENTICATIONFAILED)',
+    )
+  })
+
+  it('does not repeat a code already present in the text', () => {
+    expect(describeMailError(imapError('[ALERT] over quota', 'ALERT'))).toBe('[ALERT] over quota')
+  })
+
+  it('falls back to the message for non-IMAP failures', () => {
+    expect(describeMailError(new Error('getaddrinfo ENOTFOUND imap.gmail.com'))).toBe(
+      'getaddrinfo ENOTFOUND imap.gmail.com',
+    )
+  })
+
+  it('survives a code-only error and a non-error throw', () => {
+    expect(describeMailError(Object.assign(new Error(''), { serverResponseCode: 'NO' }))).toBe('NO')
+    expect(describeMailError('boom')).toBe('boom')
+    expect(describeMailError(null)).toBe('null')
+    expect(describeMailError(new Error(''))).toBe('mail read failed')
   })
 })
