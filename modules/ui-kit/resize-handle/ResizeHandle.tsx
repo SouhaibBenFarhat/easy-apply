@@ -15,10 +15,13 @@ export interface ResizeHandleProps {
   step?: number
 }
 
-// A draggable window splitter — a thin divider whose 1px line thickens on hover
-// and focus. Pointer capture keeps the drag alive even when the cursor leaves
-// the handle. Neutral tones only (copper stays scarce); the active/focus line
-// uses `info`. Keyboard-operable: Arrow keys nudge, Shift for a bigger step.
+// A draggable window splitter — a 1px divider line that recolors on hover and
+// focus. It occupies exactly 1px of layout, like the `border-r` it replaces:
+// a wider box would open a visible gutter between the panels (the grab zone is
+// an invisible pseudo-element straddling the line instead). Pointer capture
+// keeps the drag alive even when the cursor leaves the handle. Neutral tones
+// only (copper stays scarce); the active/focus line uses `info`.
+// Keyboard-operable: Arrow keys nudge, Shift for a bigger step.
 export function ResizeHandle({
   value,
   min,
@@ -74,14 +77,14 @@ export function ResizeHandle({
       onPointerUp={handlePointerUp}
       onKeyDown={handleKeyDown}
       className={cn(
-        'group relative flex w-1.5 shrink-0 cursor-col-resize touch-none select-none items-stretch justify-center outline-none',
+        'relative z-10 w-px shrink-0 cursor-col-resize touch-none select-none bg-border outline-none transition-colors',
+        'hover:bg-foreground-subtle focus-visible:bg-info active:bg-info',
+        // Invisible 9px grab zone straddling the line: comfortable to hit
+        // without costing layout width. z-10 keeps it above the neighbouring
+        // panels, which sit later in the DOM.
+        'after:absolute after:inset-y-0 after:-left-1 after:-right-1 after:content-[""]',
         className,
       )}
-    >
-      <span
-        className="w-px bg-border transition-colors group-hover:bg-foreground-subtle group-focus-visible:bg-info group-active:bg-info"
-        aria-hidden
-      />
-    </div>
+    />
   )
 }
