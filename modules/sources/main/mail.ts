@@ -1,10 +1,10 @@
-// IMAP transport for the email-ingestion source (LinkedIn/Indeed/StepStone/
-// Xing job-alert emails from the user's own inbox). Built driver-injected and
-// fake-tested BEFORE the per-sender parsers need it — the same transport-first
-// approach as PoliteHttpClient (§4.3). The real driver (an imapflow adapter)
-// is a thin layer added when going live; the engine and tests drive everything
-// through the MailDriver interface, so no network or real mailbox is needed to
-// exercise the read/filter/close logic.
+// IMAP transport for the email-ingestion source — reads recent messages from
+// the user's own inbox and hands them to the LLM extractor. Built
+// driver-injected and fake-tested, the same transport-first approach as
+// PoliteHttpClient (§4.3). The real driver (an imapflow adapter) is a thin
+// layer added when going live; the engine and tests drive everything through
+// the MailDriver interface, so no network or real mailbox is needed to
+// exercise the read/close logic.
 
 // One decoded message pulled from the inbox. `html`/`text` are the decoded
 // body parts; parsers prefer `html` and fall back to `text`.
@@ -15,11 +15,12 @@ export interface MailMessage {
   date: string // ISO; the fetchedAt fallback when a posting has no date
   html: string | null
   text: string | null
+  messageId: string | null // RFC822 Message-ID header — used to deep-link Gmail
 }
 
-// The mailbox search window. Server-side we constrain by mailbox + date; the
-// sender filter is re-applied client-side (below) so a loose server never
-// leaks unrelated mail into the parsers.
+// The mailbox search window — constrained by mailbox + date only. We no longer
+// filter by sender: every recent email is handed to the LLM, which decides
+// whether it holds job postings (the "read everything" mode).
 export interface MailSearchQuery {
   mailbox: string // e.g. the 'Jobs' label the user filters alerts into
   since: Date
@@ -27,7 +28,7 @@ export interface MailSearchQuery {
 
 // The seam between this module and the outside world: the real implementation
 // wraps imapflow, tests pass a fake. Lifecycle is connect → search → close,
-// and readAlertMessages guarantees close() runs even when search() throws.
+// and readRecentMessages guarantees close() runs even when search() throws.
 export interface MailDriver {
   connect(): Promise<void>
   search(query: MailSearchQuery): Promise<MailMessage[]>
@@ -46,32 +47,22 @@ export interface MailAccount {
   password: string
 }
 
-export interface ReadAlertOptions {
+export interface ReadRecentOptions {
   mailbox: string
-  // Sender fragments to keep, matched case-insensitively as substrings of the
-  // From address (e.g. 'linkedin.com', 'indeed.com') so sub-addressing and
-  // display-name noise never break the match.
-  senderPatterns: string[]
   since: Date
 }
 
-// Connect, search the window, keep only messages from the wanted senders, and
-// always close the connection. Pure orchestration over the injected driver —
-// no imapflow import here, so it unit-tests against a fake with zero I/O.
-export async function readAlertMessages(
+// Connect, search the window, return every message, and always close the
+// connection. Pure orchestration over the injected driver — no imapflow import
+// here, so it unit-tests against a fake with zero I/O. No sender filtering: the
+// LLM sees every recent email and decides what holds jobs.
+export async function readRecentMessages(
   driver: MailDriver,
-  options: ReadAlertOptions,
+  options: ReadRecentOptions,
 ): Promise<MailMessage[]> {
-  const patterns = options.senderPatterns.map((pattern) => pattern.toLowerCase())
   await driver.connect()
   try {
-    const messages = await driver.search({ mailbox: options.mailbox, since: options.since })
-    // Defensive re-filter: never trust the server applied the sender constraint
-    // exactly — one stray newsletter must not reach a parser.
-    return messages.filter((message) => {
-      const from = message.from.toLowerCase()
-      return patterns.some((pattern) => from.includes(pattern))
-    })
+    return await driver.search({ mailbox: options.mailbox, since: options.since })
   } finally {
     await driver.close()
   }

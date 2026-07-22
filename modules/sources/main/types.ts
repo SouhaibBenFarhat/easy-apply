@@ -27,16 +27,42 @@ export interface RawPayload {
   body: string
 }
 
+// Running counts for the email→job funnel, carried on 'pipeline' events so the
+// monitor renders live progress. Mirrored in src/preload/electron-api.d.ts.
+export interface AgentPipelineStats {
+  emailsTotal: number // emails handed to the agent this run
+  emailsProcessed: number // emails the agent has finished (progress)
+  emailsAccepted: number // emails that yielded ≥1 kept job
+  emailsRejected: number // emails that yielded no job
+  jobsProposed: number // raw items the LLM returned, before the keep-harness
+  jobsKept: number // items that survived the harness → reached the feed
+  capped: boolean // true when the inbox exceeded the per-run scan cap
+  done: boolean // the run has finished or been stopped (drives the Stop button)
+  paused: boolean // the run is held mid-scan, waiting to resume
+  // The email currently in flight (null between emails / when done). `url` is a
+  // Gmail deep link to the message, or null when it can't be built.
+  current: { subject: string; sender: string; url: string | null } | null
+}
+
 // One line in the agent's live activity trace (surfaced in the header panel).
 // seq/at are stamped by the broadcaster; callers supply the rest.
 export interface AgentTraceInput {
-  channel: 'sync' | 'mailbox' | 'llm'
+  channel: 'sync' | 'mailbox' | 'llm' | 'pipeline' | 'thinking'
   label: string
-  body?: string // the full prompt or response text, for llm lines
+  body?: string // the full prompt/response/reasoning text
   chars?: number // context load (prompt/response size)
+  stats?: AgentPipelineStats // funnel counts, on 'pipeline' events
 }
 
 export type TraceFn = (event: AgentTraceInput) => void
+
+// Memory of which emails the mailbox agent has already scanned (by Message-ID),
+// so each sync only runs the LLM on new mail. Backed by persistent storage in
+// the main-process glue; absent means "scan everything" (e.g. in tests).
+export interface ProcessedMessages {
+  has(messageId: string): boolean
+  add(messageId: string): void
+}
 
 export interface FetchContext {
   http: PoliteHttpClient
@@ -51,6 +77,21 @@ export interface FetchContext {
   llm?: LlmClient
   // Live activity trace for the header monitor (no-op when not wired).
   trace?: TraceFn
+  // Aborts a long provider run (email scan) between units of work — the user's
+  // Stop button / turning AI off. Undefined when interruption isn't wired.
+  signal?: AbortSignal
+  // Cooperative pause: the provider checks isPaused() between units of work and,
+  // when paused, awaits waitForResume() (which also resolves on Stop, so a
+  // paused run can still be aborted). Undefined when pausing isn't wired.
+  isPaused?: () => boolean
+  waitForResume?: () => Promise<void>
+  // Already-scanned email memory, so a sync only LLMs new mail.
+  processedMessages?: ProcessedMessages
+  // Persist a batch of jobs to the DB immediately, mid-fetch — provided by the
+  // engine. Long runs (email scan) save each email's jobs as they go so a crash
+  // (or dev restart) never loses work; the provider then marks that email
+  // processed only AFTER its jobs are durable. Returns insert/update counts.
+  saveJobs?: (jobs: NormalizedJob[]) => Promise<{ inserted: number; updated: number }>
 }
 
 export interface JobSourceProvider {

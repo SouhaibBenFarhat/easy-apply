@@ -36,6 +36,7 @@ export function readStoredFeedFilters(): FeedFilters {
       if (scopes.length > 0) filters.remoteScopes = scopes
     }
     if (record.hasSalary === true) filters.hasSalary = true
+    if (record.origin === 'agent' || record.origin === 'api') filters.origin = record.origin
     return filters
   } catch {
     return {}
@@ -61,6 +62,48 @@ export function useLastFeedVisit(): UseQueryResult<string | null, Error> {
     queryKey: keys.local.lastFeedVisit,
     queryFn: () => localStorage.getItem(LAST_FEED_VISIT_STORAGE_KEY),
     // Only useMarkFeedVisited changes it, and that writes the cache directly.
+    staleTime: Number.POSITIVE_INFINITY,
+  })
+}
+
+export const PANEL_WIDTHS_STORAGE_KEY = 'easyapply-panel-widths'
+
+// Remembered widths (px) of the resizable panels: the feed's job list and the
+// agent activity panel.
+export interface PanelWidths {
+  jobs: number
+  activity: number
+}
+
+export const DEFAULT_PANEL_WIDTHS: PanelWidths = { jobs: 420, activity: 320 }
+
+function readWidth(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+// Loose read — stale/garbage storage falls back to the defaults, never throws.
+export function readStoredPanelWidths(): PanelWidths {
+  try {
+    const raw = localStorage.getItem(PANEL_WIDTHS_STORAGE_KEY)
+    if (raw === null) return DEFAULT_PANEL_WIDTHS
+    const parsed: unknown = JSON.parse(raw)
+    if (typeof parsed !== 'object' || parsed === null) return DEFAULT_PANEL_WIDTHS
+    const record = parsed as Record<string, unknown>
+    return {
+      jobs: readWidth(record.jobs, DEFAULT_PANEL_WIDTHS.jobs),
+      activity: readWidth(record.activity, DEFAULT_PANEL_WIDTHS.activity),
+    }
+  } catch {
+    return DEFAULT_PANEL_WIDTHS
+  }
+}
+
+// Panel widths, remembered across restarts via localStorage.
+export function useStoredPanelWidths(): UseQueryResult<PanelWidths, Error> {
+  return useQuery({
+    queryKey: keys.local.panelWidths,
+    queryFn: readStoredPanelWidths,
+    initialData: readStoredPanelWidths,
     staleTime: Number.POSITIVE_INFINITY,
   })
 }

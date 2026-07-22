@@ -1,4 +1,10 @@
-import { buildDedupeKey, cleanText, stripHtml, toIsoOrNull } from './normalize'
+import {
+  buildDedupeKey,
+  cleanText,
+  stripHtml,
+  stripHtmlKeepingLinks,
+  toIsoOrNull,
+} from './normalize'
 
 describe('buildDedupeKey', () => {
   it('joins normalized company|title|location', () => {
@@ -89,8 +95,34 @@ describe('stripHtml', () => {
     ['non&nbsp;breaking', 'non breaking'],
     ['<div class="x">nested <span>tags</span></div>', 'nested tags'],
     ['no markup at all', 'no markup at all'],
+    // Style/script/head/comment CONTENT is dropped, not surfaced as text —
+    // otherwise inline CSS (huge in LinkedIn emails) crowds out the real jobs.
+    ['<style>.a{color:red}</style>Real content', 'Real content'],
+    ['<script>alert(1)</script>Real content', 'Real content'],
+    ['<head><title>Doc</title></head><body>Jobs</body>', 'Jobs'],
+    ['<!--[if mso]>outlook<![endif]-->Visible', 'Visible'],
   ])('strips %j to %j', (input, expected) => {
     expect(stripHtml(input)).toBe(expected)
+  })
+})
+
+describe('stripHtmlKeepingLinks', () => {
+  it('preserves the apply URL from the anchor href (the job link)', () => {
+    const html = '<a href="https://linkedin.com/jobs/view/123">Senior Full Stack Engineer</a>'
+    expect(stripHtmlKeepingLinks(html)).toBe(
+      'Senior Full Stack Engineer (https://linkedin.com/jobs/view/123)',
+    )
+  })
+
+  it('keeps the URL even when the link text is a bare "View"', () => {
+    expect(stripHtmlKeepingLinks('Backend Engineer <a href="https://x.com/apply/9">View</a>')).toBe(
+      'Backend Engineer View (https://x.com/apply/9)',
+    )
+  })
+
+  it('still drops style noise and other tags', () => {
+    const html = '<style>.a{color:red}</style><p><a href="https://x.com/1">Role</a></p>'
+    expect(stripHtmlKeepingLinks(html)).toBe('Role (https://x.com/1)')
   })
 })
 

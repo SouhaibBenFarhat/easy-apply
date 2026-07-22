@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { type MailDriver, type MailMessage, readAlertMessages } from './mail'
+import { type MailDriver, type MailMessage, readRecentMessages } from './mail'
 
 function message(uid: number, from: string): MailMessage {
   return {
@@ -10,12 +10,13 @@ function message(uid: number, from: string): MailMessage {
     date: '2026-07-21T09:00:00.000Z',
     html: `<p>job ${uid}</p>`,
     text: `job ${uid}`,
+    messageId: `<msg-${uid}@mail>`,
   }
 }
 
 // A fake driver that records lifecycle calls and returns a canned result (or
-// throws from search), so the read/filter/close logic is exercised with zero
-// network or real mailbox — the PoliteHttpClient fake-injection pattern.
+// throws from search), so the read/close logic is exercised with zero network
+// or real mailbox — the PoliteHttpClient fake-injection pattern.
 function fakeDriver(result: MailMessage[] | Error, calls: string[]): MailDriver {
   return {
     connect: async () => {
@@ -32,33 +33,32 @@ function fakeDriver(result: MailMessage[] | Error, calls: string[]): MailDriver 
   }
 }
 
-describe('readAlertMessages', () => {
+describe('readRecentMessages', () => {
   const options = {
-    mailbox: 'Jobs',
-    senderPatterns: ['linkedin.com', 'indeed.com'],
+    mailbox: 'INBOX',
     since: new Date('2026-07-01T00:00:00.000Z'),
   }
 
-  it('keeps only messages from the wanted senders, case-insensitively', async () => {
+  it('returns every message the driver yields, regardless of sender', async () => {
     const calls: string[] = []
     const driver = fakeDriver(
       [
         message(1, 'jobalerts-noreply@linkedin.com'),
-        message(2, 'alert@INDEED.com'),
+        message(2, 'alert@indeed.com'),
         message(3, 'newsletter@some-recruiter.io'),
-        message(4, 'noreply@stepstone.de'),
       ],
       calls,
     )
 
-    const kept = await readAlertMessages(driver, options)
+    const messages = await readRecentMessages(driver, options)
 
-    expect(kept.map((m) => m.uid)).toEqual([1, 2])
+    // No sender filtering: the LLM decides what holds jobs.
+    expect(messages.map((m) => m.uid)).toEqual([1, 2, 3])
   })
 
   it('connects, searches, then closes — in order', async () => {
     const calls: string[] = []
-    await readAlertMessages(fakeDriver([], calls), options)
+    await readRecentMessages(fakeDriver([], calls), options)
     expect(calls).toEqual(['connect', 'search', 'close'])
   })
 
@@ -66,7 +66,7 @@ describe('readAlertMessages', () => {
     const calls: string[] = []
     const driver = fakeDriver(new Error('IMAP timeout'), calls)
 
-    await expect(readAlertMessages(driver, options)).rejects.toThrow('IMAP timeout')
+    await expect(readRecentMessages(driver, options)).rejects.toThrow('IMAP timeout')
     expect(calls).toEqual(['connect', 'search', 'close'])
   })
 })

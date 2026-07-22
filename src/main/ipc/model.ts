@@ -17,7 +17,7 @@ export interface ModelProgressEvent {
   done: boolean
 }
 
-export function registerModelIpc(manager: ModelManager): void {
+export function registerModelIpc(manager: ModelManager, stopSync?: () => void): void {
   const broadcast = (event: ModelProgressEvent): void => {
     for (const window of BrowserWindow.getAllWindows())
       window.webContents.send('model:progress', event)
@@ -76,7 +76,24 @@ export function registerModelIpc(manager: ModelManager): void {
       try {
         if (typeof enabled !== 'boolean') return fail('enabled must be a boolean')
         store.set('aiEnabled', enabled)
+        // Turning AI off aborts any running scan too, so it stops promptly
+        // rather than limping through the rest of the inbox.
+        if (!enabled) stopSync?.()
         await manager.setAiEnabled(enabled) // unloads the model now when turning off
+        return ok(await manager.getStatus())
+      } catch (error) {
+        return fail(error)
+      }
+    },
+  )
+
+  ipcMain.handle(
+    'model:select',
+    async (_event, modelId: unknown): Promise<IpcResult<ModelStatus>> => {
+      try {
+        if (typeof modelId !== 'string') return fail('modelId must be a string')
+        await manager.select(modelId) // cancels any download + unloads the old model
+        store.set('modelId', manager.selectedModelId())
         return ok(await manager.getStatus())
       } catch (error) {
         return fail(error)

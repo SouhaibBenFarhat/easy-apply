@@ -32,6 +32,7 @@ export interface QueryKeys {
   readonly local: {
     readonly feedFilters: readonly ['local', 'feedFilters']
     readonly lastFeedVisit: readonly ['local', 'lastFeedVisit']
+    readonly panelWidths: readonly ['local', 'panelWidths']
   }
 }
 
@@ -63,5 +64,6 @@ export const keys: QueryKeys = {
   local: {
     feedFilters: ['local', 'feedFilters'],
     lastFeedVisit: ['local', 'lastFeedVisit'],
+    panelWidths: ['local', 'panelWidths'],
   },
 }

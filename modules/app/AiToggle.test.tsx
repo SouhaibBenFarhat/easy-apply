@@ -25,6 +25,8 @@ describe('AiToggle', () => {
         downloadedBytes: 1,
         error: null,
         enabled: false,
+        reasoning: false,
+        catalog: [],
       },
     })
     render(<AiToggle />)

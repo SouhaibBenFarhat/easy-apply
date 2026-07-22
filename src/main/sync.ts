@@ -2,7 +2,7 @@ import { createLogger } from '@logger/main'
 import type { AppDatabase, SyncRun } from '@persistence/main'
 import { listRecentSyncRuns } from '@persistence/main'
 import type { AgentTraceInput, LlmClient, SyncEvent, SyncSummary } from '@sources/main'
-import { PoliteHttpClient, PROVIDERS, runSync } from '@sources/main'
+import { PoliteHttpClient, PROVIDERS, runSync, splitThinking } from '@sources/main'
 import type { IpcResult } from '@sources/shared'
 import { fail, ok, resolveSearchProfile } from '@sources/shared'
 import { app, BrowserWindow, ipcMain } from 'electron'
@@ -30,12 +30,29 @@ const SCHEDULER_TICK_MS = 30 * 60_000
 // Slightly above the client default (1 s): sync is background traffic, it can
 // afford to be extra polite.
 const SYNC_REQUEST_GAP_MS = 1_200
+// How many scanned-mail ids to remember (most-recent-wins) so the store doesn't
+// grow without bound. ~30 days of mail fits comfortably.
+const PROCESSED_MAIL_CAP = 5_000
 
-export function installSync(db: AppDatabase, modelManager: ModelManager): void {
+export function installSync(db: AppDatabase, modelManager: ModelManager): () => void {
   const logger = createLogger('sync')
   // Single-flight guard: one sync pass at a time, manual or scheduled.
   let running: Promise<SyncSummary> | null = null
   let lastCompletedAt: string | null = null
+  // The running pass's abort handle — the Stop button and AI-off abort through
+  // it, halting the (slow) email scan between messages.
+  let activeController: AbortController | null = null
+  // Cooperative pause: the scan holds at waitForResume() until resume() (or a
+  // Stop, which also releases waiters so the aborted run can exit).
+  let paused = false
+  let resumeWaiters: Array<() => void> = []
+  const releaseResume = (): void => {
+    const waiters = resumeWaiters
+    resumeWaiters = []
+    for (const resolve of waiters) resolve()
+  }
+  const waitForResume = (): Promise<void> =>
+    paused ? new Promise<void>((resolve) => resumeWaiters.push(resolve)) : Promise.resolve()
 
   const broadcast = (event: SyncEvent): void => {
     for (const window of BrowserWindow.getAllWindows()) window.webContents.send('sync:event', event)
@@ -50,28 +67,47 @@ export function installSync(db: AppDatabase, modelManager: ModelManager): void {
       window.webContents.send('agent:trace', event)
   }
 
-  // Wrap the LLM so every extraction call surfaces its prompt (the context) and
-  // response in the trace — the thing that makes the agent visible.
+  // Wrap the LLM so every extraction call surfaces its prompt (the context),
+  // any reasoning, and the response in the trace — the thing that makes the
+  // agent visible. Reasoning models return a <think>…</think> block; we split it
+  // out so the "thinking" area shows it and the extractor parses clean output.
   const traced = (inner: LlmClient): LlmClient => ({
-    complete: async (prompt: string): Promise<string> => {
+    complete: async (prompt: string, options): Promise<string> => {
       traceEmit({
         channel: 'llm',
         label: `Prompt · ${prompt.length} chars`,
         body: prompt,
         chars: prompt.length,
       })
-      const response = await inner.complete(prompt)
+      const raw = await inner.complete(prompt, options)
+      const { thinking, answer } = splitThinking(raw)
+      if (thinking !== '') {
+        traceEmit({
+          channel: 'thinking',
+          label: `Thinking · ${thinking.length} chars`,
+          body: thinking,
+          chars: thinking.length,
+        })
+      }
       traceEmit({
         channel: 'llm',
-        label: `Response · ${response.length} chars`,
-        body: response,
-        chars: response.length,
+        label: `Response · ${answer.length} chars`,
+        body: answer,
+        chars: answer.length,
       })
-      return response
+      return answer
     },
   })
 
   const start = (force: boolean): Promise<SyncSummary> => {
+    const controller = new AbortController()
+    activeController = controller
+    // A fresh pass never starts paused; clear any stale waiters.
+    paused = false
+    releaseResume()
+    // Scanned-mail memory for this pass, so the mailbox agent only LLMs new
+    // mail; persisted (capped, most-recent-wins) after the pass settles.
+    const seenMailIds = new Set(store.get('processedMailIds'))
     const promise = (async (): Promise<SyncSummary> => {
       // The manager gives us the loaded LLM only when AI is on AND the model is
       // downloaded; null otherwise (off → RAM stays free, model skipped).
@@ -96,6 +132,19 @@ export function installSync(db: AppDatabase, modelManager: ModelManager): void {
           createMail: createImapMailDriver,
           llm: rawLlm === null ? undefined : traced(rawLlm),
           trace: traceEmit,
+          signal: controller.signal,
+          isPaused: () => paused,
+          waitForResume,
+          processedMessages: {
+            has: (id) => seenMailIds.has(id),
+            // Persist on EVERY add (not just at pass end), so a mid-scan restart
+            // — e.g. dev hot-reload — resumes instead of re-scanning from the
+            // start. Cheap relative to the per-email LLM call.
+            add: (id) => {
+              seenMailIds.add(id)
+              store.set('processedMailIds', [...seenMailIds].slice(-PROCESSED_MAIL_CAP))
+            },
+          },
         },
         // Manual "Sync now" forces past the per-provider minInterval — the user
         // asked explicitly; only the automatic scheduler stays polite.
@@ -116,6 +165,9 @@ export function installSync(db: AppDatabase, modelManager: ModelManager): void {
       })
       .finally(() => {
         running = null
+        if (activeController === controller) activeController = null
+        paused = false
+        releaseResume()
       })
     return promise
   }
@@ -157,4 +209,53 @@ export function installSync(db: AppDatabase, modelManager: ModelManager): void {
       return fail(error)
     }
   })
+
+  // Interrupt the running pass (the email scan). Resolves true if a pass was
+  // actually aborted, false if nothing was running.
+  ipcMain.handle('agent:stop', async (): Promise<IpcResult<boolean>> => {
+    try {
+      const wasRunning = activeController !== null
+      if (wasRunning) traceEmit({ channel: 'sync', label: 'Stop requested' })
+      // Release a paused scan so it wakes, sees the abort, and exits cleanly.
+      paused = false
+      releaseResume()
+      activeController?.abort()
+      return ok(wasRunning)
+    } catch (error) {
+      return fail(error)
+    }
+  })
+
+  // Hold the running scan between emails. Resolves true if it actually paused.
+  ipcMain.handle('agent:pause', async (): Promise<IpcResult<boolean>> => {
+    try {
+      if (running === null || paused) return ok(false)
+      paused = true
+      traceEmit({ channel: 'sync', label: 'Pause requested' })
+      return ok(true)
+    } catch (error) {
+      return fail(error)
+    }
+  })
+
+  // Resume a paused scan from exactly where it held.
+  ipcMain.handle('agent:resume', async (): Promise<IpcResult<boolean>> => {
+    try {
+      if (!paused) return ok(false)
+      paused = false
+      releaseResume()
+      traceEmit({ channel: 'sync', label: 'Resume requested' })
+      return ok(true)
+    } catch (error) {
+      return fail(error)
+    }
+  })
+
+  // Let callers (e.g. turning AI off) abort a running pass too — release any
+  // paused waiters first so the loop can exit.
+  return () => {
+    paused = false
+    releaseResume()
+    activeController?.abort()
+  }
 }

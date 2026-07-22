@@ -274,6 +274,27 @@ describe('runSync — failure isolation', () => {
     expect(baRun?.finishedAt).not.toBeNull()
   })
 
+  it('persists and counts jobs a provider saved incrementally via ctx.saveJobs', async () => {
+    // Mirrors the mailbox provider: save as you go (so a crash mid-run keeps
+    // the work), then hand back an EMPTY payload — the counts must still land.
+    const incremental: JobSourceProvider = {
+      ...makeProvider({ id: 'ba' }),
+      fetch: async (ctx): Promise<RawPayload[]> => {
+        await ctx.saveJobs?.([makeJob('ba:inc-1')])
+        await ctx.saveJobs?.([makeJob('ba:inc-2')])
+        await ctx.saveJobs?.([]) // empty batch is a no-op
+        return []
+      },
+    }
+
+    const summary = await runSync(makeDeps([incremental]))
+
+    expect(summary.inserted).toBe(2)
+    expect(summary.perSource[0]).toMatchObject({ ok: true, inserted: 2, updated: 0 })
+    expect(await getJob(db, 'ba:inc-1')).not.toBeNull()
+    expect(await getJob(db, 'ba:inc-2')).not.toBeNull()
+  })
+
   it('stringifies non-Error throws into the recorded error', async () => {
     const ba = makeProvider({ id: 'ba' })
     const weird: JobSourceProvider = {

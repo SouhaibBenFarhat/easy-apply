@@ -20,13 +20,15 @@ export {
   type MailDriver,
   type MailMessage,
   type MailSearchQuery,
-  type ReadAlertOptions,
-  readAlertMessages,
+  type ReadRecentOptions,
+  readRecentMessages,
 } from './mail'
 export {
   buildExtractionPrompt,
+  type ExtractionResult,
   extractJobsFromEmail,
   type LlmClient,
+  type LlmCompleteOptions,
 } from './mail-extract'
 export {
   addAccount,
@@ -36,13 +38,22 @@ export {
   removeAccount,
   serializeAccounts,
 } from './mailbox-accounts'
-export { buildDedupeKey, cleanText, stripHtml, toIsoOrNull } from './normalize'
+export {
+  buildDedupeKey,
+  cleanText,
+  stripHtml,
+  stripHtmlKeepingLinks,
+  toIsoOrNull,
+} from './normalize'
 export { decodeProviderConfig, encodeProviderConfig } from './provider-config-codec'
 export { getProvider, listProviderMeta, PROVIDERS } from './registry'
+export { type SplitThinking, splitThinking } from './thinking'
 export type {
+  AgentPipelineStats,
   AgentTraceInput,
   FetchContext,
   JobSourceProvider,
+  ProcessedMessages,
   ProviderMeta,
   RawPayload,
   TraceFn,

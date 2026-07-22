@@ -14,6 +14,10 @@ interface StoreSchema {
   searchProfile: SearchProfile
   syncIntervalHours: number
   aiEnabled: boolean
+  modelId: string
+  // Message-ids the mailbox agent has already scanned — so a sync only runs the
+  // LLM on NEW mail. Capped (most-recent-wins) to bound growth.
+  processedMailIds: string[]
 }
 
 export const store: Store<StoreSchema> = new Store<StoreSchema>({
@@ -22,6 +26,9 @@ export const store: Store<StoreSchema> = new Store<StoreSchema>({
     searchProfile: DEFAULT_SEARCH_PROFILE,
     syncIntervalHours: 3,
     aiEnabled: true,
+    // The selected local model — the fast instruct model by default.
+    modelId: 'llama-3.1-8b-instruct-q4',
+    processedMailIds: [],
   },
 })
 

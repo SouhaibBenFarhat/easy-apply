@@ -18,29 +18,60 @@ export interface ModelInfo {
   url: string
   sizeBytes: number
   filename: string
+  // Reasoning models (DeepSeek-R1, …) emit a <think>…</think> block before the
+  // answer; the trace layer surfaces that as the "thinking" area.
+  reasoning: boolean
 }
 
-// Llama 3.1 8B Instruct, GGUF Q4_K_M (~4.9 GB) — the reliable-enough local
-// model for job-email extraction. Verify url/size against the live file on the
-// first real download.
-export const DEFAULT_MODEL: ModelInfo = {
-  id: 'llama-3.1-8b-instruct-q4',
-  displayName: 'Llama 3.1 8B Instruct (Q4)',
-  url: 'https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf',
-  sizeBytes: 4_920_000_000,
-  filename: 'Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf',
-}
+// The downloadable local-model catalog. Verify url/size against the live files
+// on the first real download. Q4_K_M GGUF quantization throughout.
+export const MODEL_CATALOG: readonly ModelInfo[] = [
+  {
+    // Fast instruct model — the default, ideal for the mechanical email→JSON
+    // extraction. ~4.9 GB.
+    id: 'llama-3.1-8b-instruct-q4',
+    displayName: 'Llama 3.1 8B Instruct (Q4)',
+    url: 'https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf',
+    sizeBytes: 4_920_000_000,
+    filename: 'Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf',
+    reasoning: false,
+  },
+  {
+    // Reasoning model — bigger and slower, but thinks through judgment calls
+    // (fit, preferences). ~9 GB; comfortable on 24 GB unified memory.
+    id: 'deepseek-r1-distill-qwen-14b-q4',
+    displayName: 'DeepSeek-R1 Distill 14B (Q4)',
+    url: 'https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-14B-Q4_K_M.gguf',
+    sizeBytes: 8_990_000_000,
+    filename: 'DeepSeek-R1-Distill-Qwen-14B-Q4_K_M.gguf',
+    reasoning: true,
+  },
+]
+
+// The default selected model — the fast instruct one.
+export const DEFAULT_MODEL: ModelInfo = MODEL_CATALOG[0] as ModelInfo
 
 export type ModelState = 'absent' | 'downloading' | 'ready' | 'error'
 
+// One entry in the picker: enough to render the choice and whether it's on disk.
+export interface ModelChoice {
+  id: string
+  displayName: string
+  sizeBytes: number
+  reasoning: boolean
+  installed: boolean
+}
+
 export interface ModelStatus {
   state: ModelState
-  modelId: string
+  modelId: string // the selected model
   displayName: string
   totalBytes: number
   downloadedBytes: number
   error: string | null
   enabled: boolean // when off, the model stays unloaded to free RAM
+  reasoning: boolean // the selected model is a reasoning model
+  catalog: ModelChoice[] // every downloadable model + its installed state
 }
 
 export interface ModelProgress {
@@ -50,21 +81,73 @@ export interface ModelProgress {
 }
 
 export class ModelManager {
-  private readonly model: ModelInfo
+  private readonly catalog: readonly ModelInfo[]
   private readonly logger = createLogger('llm')
   private readonly dir: string
+  private selectedId: string
   private controller: AbortController | null = null
   private lastError: string | null = null
   private aiEnabled = true
   private llmHandle: DisposableLlm | null = null
 
-  constructor(model: ModelInfo = DEFAULT_MODEL) {
-    this.model = model
+  constructor(catalog: readonly ModelInfo[] = MODEL_CATALOG, selectedId?: string) {
+    this.catalog = catalog
+    this.selectedId = selectedId ?? catalog[0]?.id ?? ''
     this.dir = join(app.getPath('userData'), 'models')
+  }
+
+  // The currently selected model (falls back to the first if the stored id is
+  // stale). Everything below — path, download, resolveLlm — keys off this.
+  private get model(): ModelInfo {
+    return (
+      this.catalog.find((entry) => entry.id === this.selectedId) ?? (this.catalog[0] as ModelInfo)
+    )
   }
 
   private get filePath(): string {
     return join(this.dir, this.model.filename)
+  }
+
+  private filePathFor(model: ModelInfo): string {
+    return join(this.dir, model.filename)
+  }
+
+  private async isInstalled(model: ModelInfo): Promise<boolean> {
+    try {
+      await stat(this.filePathFor(model))
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  private async buildCatalog(): Promise<ModelChoice[]> {
+    return Promise.all(
+      this.catalog.map(async (model) => ({
+        id: model.id,
+        displayName: model.displayName,
+        sizeBytes: model.sizeBytes,
+        reasoning: model.reasoning,
+        installed: await this.isInstalled(model),
+      })),
+    )
+  }
+
+  selectedModelId(): string {
+    return this.selectedId
+  }
+
+  // Switch which model is active. Cancels any in-flight download, unloads the
+  // current LLM (frees its RAM), and points subsequent syncs at the new file.
+  async select(modelId: string): Promise<void> {
+    if (!this.catalog.some((entry) => entry.id === modelId))
+      throw new Error(`unknown model ${modelId}`)
+    if (modelId === this.selectedId) return
+    this.cancel()
+    await this.unloadLlm()
+    this.selectedId = modelId
+    this.lastError = null
+    this.logger.info(`model selected: ${modelId}`)
   }
 
   get downloading(): boolean {
@@ -77,6 +160,8 @@ export class ModelManager {
       displayName: this.model.displayName,
       totalBytes: this.model.sizeBytes,
       enabled: this.aiEnabled,
+      reasoning: this.model.reasoning,
+      catalog: await this.buildCatalog(),
     }
     if (this.controller !== null) {
       return {

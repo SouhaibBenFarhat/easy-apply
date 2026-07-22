@@ -1,4 +1,5 @@
 import { join } from 'node:path'
+import { createLogger } from '@logger/main'
 import { type AppDatabase, createDatabase } from '@persistence/main'
 import { app, BrowserWindow } from 'electron'
 import { registerDbIpc } from './ipc/db'
@@ -14,6 +15,23 @@ import { installSync } from './sync'
 
 // Kept intentionally thin (PLAN.md §4.1): window/lifecycle/menu/security,
 // persistence wiring, and the sync scheduler installation.
+
+const logger = createLogger('app')
+
+// Safety net: a background socket (IMAP) can emit a late error after the awaited
+// call has already returned, and Electron's default handler would pop a crash
+// dialog. Every real code path handles failures as values, so log and keep
+// running rather than taking the whole app down over a stray timeout.
+process.on('uncaughtException', (error) => {
+  logger.error(
+    `uncaught exception: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`,
+  )
+})
+process.on('unhandledRejection', (reason) => {
+  logger.error(
+    `unhandled rejection: ${reason instanceof Error ? (reason.stack ?? reason.message) : String(reason)}`,
+  )
+})
 
 let db: AppDatabase | undefined
 
@@ -70,12 +88,13 @@ app.whenReady().then(async () => {
   registerDbIpc(db)
   registerSourcesIpc(db)
   registerMailboxIpc(db)
-  const modelManager = new ModelManager()
+  const modelManager = new ModelManager(undefined, store.get('modelId'))
   // Seed the persisted AI on/off preference (nothing is loaded yet, so no
   // dispose happens here).
   await modelManager.setAiEnabled(store.get('aiEnabled'))
-  registerModelIpc(modelManager)
-  installSync(db, modelManager)
+  // installSync returns a stop handle so turning AI off also aborts a run.
+  const stopSync = installSync(db, modelManager)
+  registerModelIpc(modelManager, stopSync)
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

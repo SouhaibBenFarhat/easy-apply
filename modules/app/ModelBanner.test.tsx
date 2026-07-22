@@ -17,6 +17,8 @@ function seedModel(state: ModelStatus['state']): void {
       downloadedBytes: state === 'ready' ? 1 : 0,
       error: state === 'error' ? 'boom' : null,
       enabled: true,
+      reasoning: false,
+      catalog: [],
     },
   })
 }

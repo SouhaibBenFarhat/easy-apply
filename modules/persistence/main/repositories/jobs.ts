@@ -1,5 +1,18 @@
 import type { FeedFilters, JobStatus, NormalizedJob, StoredJob } from '@sources/shared'
-import { and, desc, eq, ilike, inArray, isNotNull, isNull, or, type SQL, sql } from 'drizzle-orm'
+import { MAILBOX_SOURCE_IDS } from '@sources/shared'
+import {
+  and,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNotNull,
+  isNull,
+  notInArray,
+  or,
+  type SQL,
+  sql,
+} from 'drizzle-orm'
 import type { AppDatabase } from '../db'
 import { jobs } from '../schema'
 
@@ -152,6 +165,10 @@ export async function listFeed(db: AppDatabase, filters: FeedFilters = {}): Prom
     conditions.push(inArray(jobs.remoteScope, filters.remoteScopes))
   if (filters.sources !== undefined && filters.sources.length > 0)
     conditions.push(inArray(jobs.sourceId, filters.sources))
+  // Origin: agent = inbox/LLM-extracted boards; api = everything else.
+  if (filters.origin === 'agent') conditions.push(inArray(jobs.sourceId, [...MAILBOX_SOURCE_IDS]))
+  else if (filters.origin === 'api')
+    conditions.push(notInArray(jobs.sourceId, [...MAILBOX_SOURCE_IDS]))
   if (filters.hasSalary === true) {
     const salaried = or(isNotNull(jobs.salaryMin), isNotNull(jobs.salaryMax))
     if (salaried !== undefined) conditions.push(salaried)

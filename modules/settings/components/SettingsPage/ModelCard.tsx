@@ -4,45 +4,41 @@ import {
   useModelProgress,
   useModelStatus,
   useRemoveModel,
+  useSelectModel,
   useSetModelEnabled,
 } from '@data'
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Switch, useToast } from '@ui-kit'
-import { Cpu, Download, X } from 'lucide-react'
+import { Badge, Card, CardContent, CardHeader, CardTitle, Switch, useToast } from '@ui-kit'
+import { Cpu } from 'lucide-react'
 import { type ReactElement, useEffect, useState } from 'react'
-
-function gb(bytes: number): string {
-  return `${(bytes / 1_000_000_000).toFixed(1)} GB`
-}
+import { ModelPicker } from './ModelPicker'
 
 // How long the armed "Confirm remove" state stays live before disarming.
 const REMOVE_ARM_MS = 3000
 
-// On-device model manager card (Phase 1): download state + a live progress bar.
-// The model runs locally to read job-alert emails into the feed. The bar fill
-// is `info`, never copper — copper stays scarce (5 uses only).
+// On-device model manager card. Downloading, progress, and removal all happen
+// per-model in the picker (the model you act on is the one under your cursor);
+// the card just owns the AI on/off switch and the shared mutations.
 export function ModelCard(): ReactElement {
   useModelProgress() // stream download progress into the status cache
   const status = useModelStatus()
   const download = useDownloadModel()
   const cancel = useCancelModelDownload()
   const remove = useRemoveModel()
+  const select = useSelectModel()
   const setEnabled = useSetModelEnabled()
   const { toast } = useToast()
-  const [removeArmed, setRemoveArmed] = useState(false)
+  // The row whose delete is armed (two-step confirm), keyed by model id.
+  const [removeArmedId, setRemoveArmedId] = useState<string | null>(null)
 
   const data = status.data
-  const total = data?.totalBytes ?? 0
-  const percent =
-    data && total > 0 ? Math.min(100, Math.round((data.downloadedBytes / total) * 100)) : 0
 
-  // Two-step confirm before deleting a ~5 GB file: first click arms, a second
-  // click removes, and this timeout quietly disarms otherwise (KeySection's
-  // pattern).
+  // Two-step confirm before deleting a multi-GB file: first click arms, a second
+  // click removes, and this timeout quietly disarms otherwise.
   useEffect(() => {
-    if (!removeArmed) return undefined
-    const timer = setTimeout(() => setRemoveArmed(false), REMOVE_ARM_MS)
+    if (removeArmedId === null) return undefined
+    const timer = setTimeout(() => setRemoveArmedId(null), REMOVE_ARM_MS)
     return () => clearTimeout(timer)
-  }, [removeArmed])
+  }, [removeArmedId])
 
   const startDownload = (): void => {
     download.mutate(undefined, {
@@ -56,13 +52,28 @@ export function ModelCard(): ReactElement {
     })
   }
 
-  const handleRemove = (): void => {
-    if (!removeArmed) {
-      setRemoveArmed(true)
+  // Downloads (or removes) the given model — selecting it first when it isn't
+  // the active one, since both operations target the selected model.
+  const handleDownload = (id: string): void => {
+    setRemoveArmedId(null)
+    if (data !== undefined && id === data.modelId) {
+      startDownload()
       return
     }
-    setRemoveArmed(false)
-    remove.mutate()
+    select.mutate(id, { onSuccess: () => startDownload() })
+  }
+
+  const handleRemove = (id: string): void => {
+    if (removeArmedId !== id) {
+      setRemoveArmedId(id)
+      return
+    }
+    setRemoveArmedId(null)
+    if (data !== undefined && id === data.modelId) {
+      remove.mutate()
+      return
+    }
+    select.mutate(id, { onSuccess: () => remove.mutate() })
   }
 
   return (
@@ -83,8 +94,8 @@ export function ModelCard(): ReactElement {
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-sm text-foreground-muted">
-          Runs locally to read job-alert emails into your feed. Downloads once (~
-          {gb(total || 4_920_000_000)}), then works fully offline — nothing leaves your Mac.
+          Runs locally to read job-alert emails into your feed. Pick a model — it downloads once,
+          then works fully offline, and nothing leaves your Mac.
         </p>
 
         {data === undefined ? null : !data.enabled ? (
@@ -92,67 +103,16 @@ export function ModelCard(): ReactElement {
             AI is <strong>off</strong> — the model is unloaded to free RAM. Turn it back on to read
             job-alert emails.
           </p>
-        ) : data.state === 'downloading' ? (
-          <div className="space-y-2">
-            {/* Recessed well one step below the card + a full-strength border
-                = a crisp track with real edges, not a flat strip (§visual-hierarchy). */}
-            <div
-              role="progressbar"
-              aria-label="Model download progress"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={percent}
-              className="h-2.5 w-full overflow-hidden rounded-full border border-border bg-surface-content"
-            >
-              <div
-                className="h-full rounded-full bg-info transition-[width]"
-                style={{ width: `${percent}%` }}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="label-caps">
-                {gb(data.downloadedBytes)} / {gb(total)} · {percent}%
-              </span>
-              {/* Cancel is a de-emphasized action → the skill's allowed ghost
-                  use (a quiet icon button), not a merging text button. */}
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                aria-label="Cancel download"
-                onClick={() => cancel.mutate()}
-              >
-                <X />
-              </Button>
-            </div>
-          </div>
-        ) : data.state === 'ready' ? (
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm">Model installed — email reading is available.</p>
-            {/* Secondary at rest (visible on the card, §visual-hierarchy),
-                destructive once armed. */}
-            <Button
-              size="sm"
-              variant={removeArmed ? 'destructive' : 'secondary'}
-              className="shrink-0"
-              onClick={handleRemove}
-            >
-              {removeArmed ? 'Confirm remove' : 'Remove'}
-            </Button>
-          </div>
         ) : (
-          <div className="space-y-2">
-            {data.state === 'error' && data.error !== null ? (
-              <p className="text-sm text-destructive">{data.error}</p>
-            ) : null}
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={download.isPending}
-              onClick={startDownload}
-            >
-              <Download /> {data.state === 'error' ? 'Retry download' : 'Download model'}
-            </Button>
-          </div>
+          <ModelPicker
+            status={data}
+            removeArmedId={removeArmedId}
+            onSelect={(id) => select.mutate(id)}
+            onDownload={handleDownload}
+            onCancel={() => cancel.mutate()}
+            onRemove={handleRemove}
+            disabled={select.isPending}
+          />
         )}
       </CardContent>
     </Card>

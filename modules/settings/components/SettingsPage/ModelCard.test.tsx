@@ -17,6 +17,23 @@ const base = {
   displayName: 'Llama 3.1 8B Instruct (Q4)',
   totalBytes: 4_920_000_000,
   enabled: true,
+  reasoning: false,
+  catalog: [
+    {
+      id: 'llama-3.1-8b-instruct-q4',
+      displayName: 'Llama 3.1 8B Instruct (Q4)',
+      sizeBytes: 4_920_000_000,
+      reasoning: false,
+      installed: true,
+    },
+    {
+      id: 'deepseek-r1-distill-qwen-14b-q4',
+      displayName: 'DeepSeek-R1 Distill 14B (Q4)',
+      sizeBytes: 8_990_000_000,
+      reasoning: true,
+      installed: false,
+    },
+  ],
 }
 const downloading: ModelStatus = {
   ...base,
@@ -36,10 +53,12 @@ describe('ModelCard', () => {
     vi.useRealTimers()
   })
 
-  it('offers a download when the model is absent', async () => {
+  it('offers a per-model download when the model is absent', async () => {
     render(<ModelCard />)
-    expect(await screen.findByRole('button', { name: /Download model/ })).toBeInTheDocument()
-    expect(screen.getByText(/Downloads once/)).toBeInTheDocument()
+    expect(
+      await screen.findByRole('button', { name: 'Download Llama 3.1 8B Instruct (Q4)' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/downloads once/i)).toBeInTheDocument()
   })
 
   it('shows a progress bar at the right percent while downloading', async () => {
@@ -59,14 +78,17 @@ describe('ModelCard', () => {
     seedStatus(errored)
     render(<ModelCard />)
     expect(await screen.findByText('HTTP 403')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Retry download/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Retry download' })).toBeInTheDocument()
   })
 
   it('starts the download on click', async () => {
     const dl = vi.spyOn(window.electron.model, 'download')
     const user = userEvent.setup()
     render(<ModelCard />)
-    await user.click(await screen.findByRole('button', { name: /Download model/ }))
+    // The selected model's row downloads directly (no re-select needed).
+    await user.click(
+      await screen.findByRole('button', { name: 'Download Llama 3.1 8B Instruct (Q4)' }),
+    )
     await waitFor(() => expect(dl).toHaveBeenCalledTimes(1))
   })
 
@@ -75,7 +97,7 @@ describe('ModelCard', () => {
     const emit = createModelProgressEmitter(mock)
     const client = createTestQueryClient()
     render(<ModelCard />, { client })
-    await screen.findByRole('button', { name: /Download model/ })
+    await screen.findByRole('button', { name: 'Download Llama 3.1 8B Instruct (Q4)' })
 
     act(() => {
       emit({ downloadedBytes: 3_690_000_000, totalBytes: 4_920_000_000, done: false })

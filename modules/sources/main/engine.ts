@@ -11,7 +11,13 @@ import type { SearchProfile, SourceId } from '@sources/shared'
 import type { PoliteHttpClient } from './http'
 import type { MailAccount, MailDriver } from './mail'
 import type { LlmClient } from './mail-extract'
-import type { FetchContext, JobSourceProvider, ProviderMeta, TraceFn } from './types'
+import type {
+  FetchContext,
+  JobSourceProvider,
+  ProcessedMessages,
+  ProviderMeta,
+  TraceFn,
+} from './types'
 
 // The sequential, politeness-respecting sync engine (PLAN.md §4.6). Pure and
 // dependency-injected — no electron imports — so vitest drives it against an
@@ -67,6 +73,13 @@ export interface SyncDeps {
   createMail?: (account: MailAccount) => MailDriver
   llm?: LlmClient
   trace?: TraceFn
+  // Aborts a long provider run between units of work (Stop / AI off).
+  signal?: AbortSignal
+  // Cooperative pause seam (Pause/Resume).
+  isPaused?: () => boolean
+  waitForResume?: () => Promise<void>
+  // Already-scanned email memory, so a sync only LLMs new mail.
+  processedMessages?: ProcessedMessages
 }
 
 export async function runSync(
@@ -94,6 +107,8 @@ export async function runSync(
   // SEQUENTIAL over the registry order on purpose (PLAN.md §2): politeness
   // means no parallel hammering, ever.
   for (const provider of deps.providers) {
+    // Stop requested mid-pass: leave the remaining providers untouched.
+    if (deps.signal?.aborted) break
     const { meta } = provider
     const state = stateById.get(meta.id)
     const enabled = state?.enabled ?? meta.enabledByDefault
@@ -121,6 +136,9 @@ export async function runSync(
     const runId = await startSyncRun(db, meta.id)
     const nowIso = now().toISOString()
     try {
+      // Incremental saves during a long fetch, so a crash mid-run keeps the
+      // work already done. Their counts fold into this source's totals.
+      let incremental = { inserted: 0, updated: 0 }
       const ctx: FetchContext = {
         http: deps.createHttp(meta),
         config: await deps.readConfig(meta.id),
@@ -129,13 +147,33 @@ export async function runSync(
         createMail: deps.createMail,
         llm: deps.llm,
         trace: deps.trace,
+        signal: deps.signal,
+        isPaused: deps.isPaused,
+        waitForResume: deps.waitForResume,
+        processedMessages: deps.processedMessages,
+        saveJobs: async (batch) => {
+          const dedup = [...new Map(batch.map((job) => [job.id, job])).values()]
+          if (dedup.length === 0) return { inserted: 0, updated: 0 }
+          const saved = await upsertJobs(db, dedup, nowIso)
+          incremental = {
+            inserted: incremental.inserted + saved.inserted,
+            updated: incremental.updated + saved.updated,
+          }
+          return saved
+        },
       }
       const payloads = await provider.fetch(ctx)
       const jobs = payloads.flatMap((payload) => provider.parse(payload, ctx))
       // Batch-level id dedupe (the same job can appear on two pages of one
       // fetch); last occurrence wins, matching upsertJobs semantics.
       const unique = [...new Map(jobs.map((job) => [job.id, job])).values()]
-      const counts = await upsertJobs(db, unique, nowIso)
+      const final = await upsertJobs(db, unique, nowIso)
+      // Providers that saved incrementally return an empty payload, so the
+      // final upsert is a no-op and the totals come from the incremental saves.
+      const counts = {
+        inserted: final.inserted + incremental.inserted,
+        updated: final.updated + incremental.updated,
+      }
       await finishSyncRun(db, runId, {
         ok: true,
         inserted: counts.inserted,

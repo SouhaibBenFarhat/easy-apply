@@ -103,6 +103,26 @@ describe('FilterBar', () => {
     expect(onChange).toHaveBeenCalledExactlyOnceWith({ sources: undefined })
   })
 
+  it('filters to inbox-agent jobs from the origin control', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    renderBar({}, onChange)
+
+    await user.click(screen.getByRole('button', { name: 'Filters' }))
+    await user.click(await screen.findByRole('button', { name: 'Inbox' }))
+    expect(onChange).toHaveBeenCalledExactlyOnceWith({ origin: 'agent' })
+  })
+
+  it('clears the origin filter via All', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    renderBar({ origin: 'agent' }, onChange)
+
+    await user.click(screen.getByRole('button', { name: 'Filters' }))
+    await user.click(await screen.findByRole('button', { name: 'All' }))
+    expect(onChange).toHaveBeenCalledExactlyOnceWith({ origin: undefined })
+  })
+
   it('resets via the All sources item', async () => {
     const onChange = vi.fn()
     const user = userEvent.setup()
