@@ -25,7 +25,8 @@
     "generate:theme": "node scripts/generate-theme.mjs",
     "build:unpack": "electron-vite build && electron-builder --dir",
     "build:mac": "electron-vite build && electron-builder --mac --arm64",
-    "prepare": "husky"
+    "prepare": "husky",
+    "generate:og": "node scripts/make-og.mjs"
   },
   "build": {
     "appId": "com.souhaibbenfarhat.easyapply",
