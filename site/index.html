@@ -4,13 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="icon" href="icon.png" type="image/png" />
-  <title>EasyApply — every job worth applying to, in one feed</title>
-  <meta name="description" content="EasyApply is a macOS app that pulls Munich and remote-Europe jobs from six official sources into one deduplicated, newest-first feed. Free, open source, installable with Homebrew." />
+  <title>EasyApply — an AI job agent that runs on your own Mac</title>
+  <meta name="description" content="EasyApply runs an AI agent on your own Mac: a local LLM reads your job-alert inbox, classifies every email, and extracts the real postings — merged with six official job APIs into one deduplicated feed, with an application tracker. Nothing is uploaded, nothing is billed. Free, open source, installable with Homebrew." />
   <link rel="canonical" href="https://souhaibbenfarhat.github.io/easy-apply/" />
   <meta name="author" content="Souhaib Ben Farhat" />
 
-  <meta property="og:title" content="EasyApply — every job worth applying to, in one feed" />
-  <meta property="og:description" content="A macOS app that pulls Munich and remote-Europe jobs from six official sources into one deduplicated, newest-first feed." />
+  <meta property="og:title" content="EasyApply — an AI job agent that runs on your own Mac" />
+  <meta property="og:description" content="An AI agent that reads your job-alert inbox on a local LLM — entirely on your Mac — and merges what it finds with six official job APIs into one deduplicated feed." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://souhaibbenfarhat.github.io/easy-apply/" />
   <meta property="og:image" content="https://souhaibbenfarhat.github.io/easy-apply/icon.png" />
@@ -102,8 +102,30 @@
     /* Hero */
     .hero { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 5rem 0 4rem; }
     .hero img.icon { width: 8rem; height: 8rem; filter: drop-shadow(0 12px 24px rgba(200, 137, 78, 0.30)); }
-    .hero h1 { font-size: clamp(2.5rem, 6vw, 3.25rem); margin: 1.75rem 0 0; }
-    .hero .tagline { max-width: 34rem; font-size: 1.125rem; line-height: 1.65; margin: 1rem 0 0; }
+    .hero h1 { margin: 1.1rem 0 0; max-width: 46rem; }
+    .hero .wordmark {
+      display: block; font-family: 'Fraunces', ui-serif, Georgia, serif; font-weight: 500;
+      font-size: 1.4rem; letter-spacing: -0.01em; color: var(--muted);
+    }
+    .hero .claim {
+      display: block; margin-top: 0.6rem;
+      font-size: clamp(2.4rem, 6.2vw, 3.5rem); line-height: 1.1;
+    }
+    .hero .claim-sub {
+      display: block; margin-top: 0.4rem; font-weight: 400;
+      font-size: clamp(1.1rem, 2.4vw, 1.5rem); line-height: 1.35; color: var(--muted);
+    }
+    .kicker {
+      display: inline-flex; align-items: center; gap: 0.5rem; margin-top: 1.5rem;
+      padding: 0.34rem 0.8rem; border-radius: 999px;
+      border: 1px solid rgba(200, 137, 78, 0.45); background: rgba(200, 137, 78, 0.10);
+      font-size: 0.66rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--accent-ink);
+    }
+    .kicker .pulse { width: 0.4rem; height: 0.4rem; border-radius: 50%; background: var(--accent); animation: kick 2.4s ease-in-out infinite; }
+    @keyframes kick { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.7); } }
+    @media (prefers-reduced-motion: reduce) { .kicker .pulse { animation: none; } }
+    .hero .tagline { max-width: 40rem; font-size: 1.05rem; line-height: 1.7; margin: 1.15rem 0 0; }
 
     .brew {
       display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
@@ -120,70 +142,112 @@
     }
     .brew:hover .copy { color: var(--accent); }
 
-    /* App-window mockup — always the dark petrol theme, the flagship look */
-    .mock { padding: 0 1.5rem 5rem; }
+    /* App-window mockup — always the dark petrol theme, the flagship look.
+       Mirrors the real layout: nav · feed cards · detail · agent activity. */
+    .mock { padding: 0 1.5rem 4rem; }
     .win {
-      max-width: 700px; margin: 0 auto; overflow: hidden; text-align: left;
+      max-width: 920px; margin: 0 auto; overflow: hidden; text-align: left;
       background: #10171d; border: 1px solid #223240; border-radius: 0.85rem;
       box-shadow: var(--shadow-lg);
     }
     .win-head {
-      display: flex; align-items: center; gap: 0.75rem; padding: 0.55rem 0.85rem;
+      display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.75rem;
       background: rgba(40, 58, 73, 0.72); border-bottom: 1px solid #223240;
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
     }
     .lights { display: flex; gap: 0.4rem; }
     .lights span { width: 0.6rem; height: 0.6rem; border-radius: 50%; }
     .win-title { font-size: 0.72rem; font-weight: 600; color: #e8ecef; }
-    .win-sync { margin-left: auto; display: flex; align-items: center; gap: 0.35rem; font-size: 0.62rem; color: #9fb0bc; }
-    .win-sync svg { width: 0.7rem; height: 0.7rem; }
-    .win-body { display: grid; grid-template-columns: 8.5rem 1fr 12.5rem; }
-    .win-side {
-      display: flex; flex-direction: column; gap: 0.15rem;
-      padding: 0.6rem 0.5rem; background: #131c24; border-right: 1px solid #223240;
+    .win-actions { margin-left: auto; display: flex; align-items: center; gap: 0.3rem; }
+    .wb {
+      display: inline-flex; align-items: center; gap: 0.22rem; padding: 0.15rem 0.38rem;
+      border-radius: 0.32rem; border: 1px solid #2b3f50; font-size: 0.55rem; color: #9fb0bc;
     }
-    .side-item {
-      display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.55rem;
-      border-radius: 0.45rem; font-size: 0.7rem; color: #9fb0bc;
-    }
-    .side-item svg { width: 0.8rem; height: 0.8rem; flex-shrink: 0; }
-    .side-item .count { margin-left: auto; font-size: 0.6rem; }
+    .wb svg { width: 0.6rem; height: 0.6rem; }
+    .wb.on { color: #e0a86b; border-color: rgba(200, 137, 78, 0.45); background: rgba(200, 137, 78, 0.12); }
+    .wb.ico { padding: 0.15rem 0.28rem; }
+    .win-body { display: grid; grid-template-columns: 6.5rem 16rem 1fr 11.5rem; min-height: 23rem; }
+
+    .win-side { display: flex; flex-direction: column; gap: 0.1rem; padding: 0.5rem 0.4rem; background: #10171d; border-right: 1px solid #223240; }
+    .side-item { display: flex; align-items: center; gap: 0.4rem; padding: 0.32rem 0.45rem; border-radius: 0.4rem; font-size: 0.62rem; color: #9fb0bc; }
+    .side-item svg { width: 0.72rem; height: 0.72rem; flex-shrink: 0; }
+    .side-item .count { margin-left: auto; font-size: 0.55rem; }
     .side-item.active { color: #e0a86b; background: rgba(200, 137, 78, 0.12); font-weight: 600; }
+
+    /* Feed — card rows on a gutter, three lines of meta, copper only on salary */
     .win-feed { display: flex; flex-direction: column; border-right: 1px solid #223240; }
-    .feed-bar {
-      display: flex; justify-content: space-between; gap: 0.5rem; padding: 0.45rem 0.75rem;
-      font-size: 0.62rem; color: #9fb0bc; border-bottom: 1px solid #223240;
-    }
-    .job {
-      display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 0.75rem 0.55rem 0.6rem;
-      border-left: 3px solid transparent; border-bottom: 1px solid #1a2530;
-    }
-    .job:last-child { border-bottom: none; }
-    .job.sel { border-left-color: #c8894e; background: #1c2a36; }
-    .job-x { flex: 1; min-width: 0; }
+    .feed-bar { display: flex; justify-content: space-between; gap: 0.5rem; padding: 0.4rem 0.6rem; font-size: 0.56rem; color: #9fb0bc; background: #1c2a36; border-bottom: 1px solid #223240; }
+    .feed-bar .tabs { display: flex; gap: 0.25rem; }
+    .feed-bar .tabs i { font-style: normal; padding: 0.06rem 0.3rem; border-radius: 0.25rem; }
+    .feed-bar .tabs i.on { background: #2b3f50; color: #e8ecef; }
+    .job { margin: 0.28rem 0.4rem 0; padding: 0.38rem 0.45rem; border: 1px solid #253747; border-radius: 0.45rem; background: #1a242e; }
+    .job.sel { border-color: #c8894e; background: rgba(200, 137, 78, 0.10); }
     .job p { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .job-t { font-size: 0.7rem; font-weight: 600; color: #e8ecef; }
-    .job .job-m { font-size: 0.6rem; color: #9fb0bc; margin-top: 0.12rem; }
-    .b {
-      flex-shrink: 0; font-size: 0.56rem; font-weight: 600; padding: 0.14rem 0.45rem;
-      border-radius: 999px; border: 1px solid #2b3f50; color: #9fb0bc; white-space: nowrap;
-    }
-    .b.copper { color: #e0a86b; border-color: rgba(200, 137, 78, 0.4); background: rgba(200, 137, 78, 0.13); }
-    .win-detail { display: flex; flex-direction: column; gap: 0.45rem; padding: 0.8rem 0.85rem; background: #121b23; }
+    .job-t { display: flex; align-items: center; gap: 0.3rem; }
+    .job-t p { font-size: 0.64rem; font-weight: 600; color: #e8ecef; min-width: 0; }
+    .job-m { display: flex; align-items: center; gap: 0.25rem; font-size: 0.54rem; color: #9fb0bc; margin-top: 0.18rem; }
+    .job-m svg { width: 0.5rem; height: 0.5rem; flex-shrink: 0; }
+    .job-m .r { margin-left: auto; flex-shrink: 0; }
+    .job-s { font-size: 0.56rem; font-weight: 600; color: #e0a86b; margin-top: 0.18rem; }
+    .b { flex-shrink: 0; margin-left: auto; font-size: 0.5rem; font-weight: 600; padding: 0.08rem 0.32rem; border-radius: 999px; border: 1px solid #2b3f50; color: #9fb0bc; }
+    .b.ok { color: #7ec8a0; border-color: rgba(126, 200, 160, 0.35); }
+
+    /* Detail pane */
+    .win-detail { display: flex; flex-direction: column; gap: 0.4rem; padding: 0.7rem 0.85rem; background: #10171d; border-right: 1px solid #223240; }
     .win-detail p { margin: 0; }
-    .det-t { font-size: 0.78rem; font-weight: 600; color: #e8ecef; }
-    .det-m { font-size: 0.62rem; color: #9fb0bc; }
-    .det-s { font-size: 0.66rem; font-weight: 600; color: #e0a86b; }
-    .det-apply {
-      align-self: flex-start; margin-top: 0.2rem; padding: 0.32rem 0.7rem;
-      background: #c8894e; color: #10171d; border-radius: 0.45rem;
-      font-size: 0.64rem; font-weight: 600;
+    .det-t { font-size: 0.82rem; font-weight: 600; color: #e8ecef; line-height: 1.25; }
+    .det-m { font-size: 0.58rem; color: #9fb0bc; }
+    .det-badges { display: flex; flex-wrap: wrap; gap: 0.25rem; align-items: center; }
+    .det-row { display: flex; flex-wrap: wrap; gap: 0.28rem; align-items: center; margin-top: 0.1rem; }
+    .det-btn { padding: 0.18rem 0.42rem; border: 1px solid #2b3f50; border-radius: 0.3rem; font-size: 0.52rem; color: #9fb0bc; }
+    .det-btn.on { color: #7ec8a0; border-color: rgba(126, 200, 160, 0.4); background: rgba(126, 200, 160, 0.12); }
+    .det-note { margin-top: 0.15rem; padding: 0.35rem 0.45rem; border: 1px solid #253747; border-radius: 0.35rem; background: #0d141a; font-size: 0.52rem; color: #7d8f9c; }
+    .det-s { font-size: 0.68rem; font-weight: 600; color: #e0a86b; }
+    .det-apply { padding: 0.22rem 0.55rem; background: #c8894e; color: #10171d; border-radius: 0.3rem; font-size: 0.55rem; font-weight: 600; }
+    .det-via { font-size: 0.52rem; color: #9fb0bc; }
+    .det-sk { height: 0.36rem; border-radius: 999px; background: #1c2833; }
+
+    /* Agent activity panel */
+    .win-act { display: flex; flex-direction: column; background: #10171d; }
+    .act-head { display: flex; align-items: center; gap: 0.3rem; padding: 0.4rem 0.5rem; background: #1c2a36; border-bottom: 1px solid #223240; font-size: 0.6rem; font-weight: 600; color: #e8ecef; }
+    .act-head svg { width: 0.65rem; height: 0.65rem; }
+    .funnel { margin: 0.4rem 0.45rem 0; padding: 0.42rem 0.48rem; border: 1px solid #253747; border-radius: 0.45rem; background: #1a242e; }
+    .fn-top { display: flex; align-items: center; gap: 0.3rem; font-size: 0.48rem; text-transform: uppercase; letter-spacing: 0.14em; color: #9fb0bc; }
+    .fn-top .n { margin-left: auto; letter-spacing: 0; }
+    .fn-top .tr { display: flex; gap: 0.15rem; }
+    .fn-top .tr b { display: inline-flex; padding: 0.06rem 0.2rem; border: 1px solid #2b3f50; border-radius: 0.2rem; color: #9fb0bc; }
+    .bar { height: 0.2rem; border-radius: 999px; background: #0d141a; margin-top: 0.38rem; overflow: hidden; }
+    .bar i { display: block; height: 100%; width: 38%; background: #4a90c2; border-radius: 999px; }
+    .fn-now { display: flex; align-items: center; gap: 0.25rem; margin-top: 0.35rem; font-size: 0.5rem; color: #9fb0bc; }
+    .fn-now svg { width: 0.5rem; height: 0.5rem; flex-shrink: 0; }
+    .fn-now span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .fn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.1rem 0.35rem; margin-top: 0.35rem; font-size: 0.5rem; color: #9fb0bc; }
+    .fn-grid span { display: flex; align-items: center; gap: 0.22rem; }
+    .fn-grid b { margin-left: auto; color: #e8ecef; font-weight: 600; }
+    .dot { width: 0.28rem; height: 0.28rem; border-radius: 50%; flex-shrink: 0; }
+    .legend { display: flex; flex-wrap: wrap; gap: 0.3rem; padding: 0.45rem 0.5rem 0.25rem; font-size: 0.46rem; color: #7d8f9c; }
+    .legend span { display: flex; align-items: center; gap: 0.18rem; }
+    .tl { display: flex; flex-direction: column; gap: 0.28rem; padding: 0 0.5rem 0.5rem; }
+    .tl-row { display: flex; align-items: center; gap: 0.32rem; font-size: 0.5rem; color: #9fb0bc; }
+    .tl-row .txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tl-row .v { margin-left: auto; flex-shrink: 0; }
+    .tl-row .v.ok { color: #7ec8a0; }
+    /* the checkpoint being worked on right now — a ring around its dot */
+    .spin { position: relative; display: flex; }
+    .spin::after {
+      content: ''; position: absolute; inset: -0.16rem; border-radius: 50%;
+      border: 1px solid #4a90c2; border-top-color: transparent; animation: sp 1.2s linear infinite;
     }
-    .det-via { font-size: 0.58rem; color: #9fb0bc; }
-    .det-sk { height: 0.42rem; border-radius: 999px; background: #1c2833; }
-    .mock-caption { max-width: 700px; margin: 1rem auto 0; text-align: center; font-size: 0.78rem; color: var(--muted); }
-    @media (max-width: 720px) {
-      .win-body { grid-template-columns: 8.5rem 1fr; }
+    @keyframes sp { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .spin::after { animation: none; } }
+
+    .mock-caption { max-width: 920px; margin: 1rem auto 0; text-align: center; font-size: 0.78rem; color: var(--muted); }
+    @media (max-width: 980px) {
+      .win-body { grid-template-columns: 6.5rem 15rem 1fr; }
+      .win-act { display: none; }
+    }
+    @media (max-width: 760px) {
+      .win-body { grid-template-columns: 6.5rem 1fr; }
       .win-detail { display: none; }
     }
     @media (max-width: 480px) {
@@ -228,6 +292,93 @@
     .terminal p.gap { margin-top: 1rem; }
     .terminal .c { color: var(--muted); user-select: none; }
 
+    /* ---- Architecture graph (inline SVG, themed from the same vars) ---- */
+    .diagram { max-width: 78rem; margin: 3.5rem auto 0; padding: 0 1.5rem; }
+    .diagram-scroll { overflow-x: auto; padding-bottom: 0.5rem; }
+    .diagram svg { display: block; width: 100%; min-width: 64rem; height: auto; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+    .dg-frame { fill: none; stroke: var(--line); stroke-dasharray: 5 5; }
+    .dg-frame-label { fill: var(--muted); font-size: 10.5px; font-weight: 600; letter-spacing: 0.16em; }
+    .dg-node { fill: var(--surface); stroke: var(--line); }
+    .dg-node-hot { fill: rgba(200, 137, 78, 0.09); stroke: rgba(200, 137, 78, 0.45); }
+    .dg-well { fill: var(--code-bg); stroke: none; }
+    .dg-t { fill: var(--heading); font-size: 13.5px; font-weight: 600; }
+    .dg-s { fill: var(--muted); font-size: 10.5px; }
+    .dg-xs { fill: var(--muted); font-size: 9.5px; }
+    .dg-hot { fill: var(--accent-ink); font-size: 10.5px; font-weight: 600; }
+    .dg-edge { fill: none; stroke: var(--line); stroke-width: 1.6; }
+    .dg-edge-hot { fill: none; stroke: rgba(200, 137, 78, 0.65); stroke-width: 1.6; }
+    .dg-lab { fill: var(--muted); font-size: 9.5px; letter-spacing: 0.04em; }
+    .dg-arrow { fill: var(--line); }
+    .dg-arrow-hot { fill: rgba(200, 137, 78, 0.65); }
+    .dg-ico { fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+    .dg-ai { fill: none; stroke: var(--accent); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+    .dg-spark { fill: var(--accent); stroke: none; }
+    /* The one thing on the page that breathes — the model is the living part. */
+    @keyframes dg-pulse { 0%, 100% { opacity: 0.16; } 50% { opacity: 0.42; } }
+    @keyframes dg-twinkle { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+    .dg-glow { animation: dg-pulse 3s ease-in-out infinite; }
+    .dg-spark-a { animation: dg-twinkle 3s ease-in-out infinite; }
+    .dg-spark-b { animation: dg-twinkle 3s ease-in-out infinite 1.5s; }
+    @media (prefers-reduced-motion: reduce) {
+      .dg-glow { animation: none; opacity: 0.22; }
+      .dg-spark-a, .dg-spark-b { animation: none; }
+    }
+    .dg-badge { fill: rgba(200, 137, 78, 0.16); stroke: rgba(200, 137, 78, 0.5); }
+    .dg-badge-t { fill: var(--accent-ink); font-size: 9.5px; font-weight: 700; letter-spacing: 0.12em; }
+    .dg-lane-hot { fill: var(--accent); font-size: 9.5px; font-weight: 700; letter-spacing: 0.16em; }
+    .dg-lane { fill: var(--muted); font-size: 9.5px; font-weight: 700; letter-spacing: 0.16em; }
+    .dg-ico-n { fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+    .diagram-caption { max-width: 46rem; margin: 1.25rem auto 0; text-align: center; font-size: 0.78rem; line-height: 1.65; color: var(--muted); }
+
+    /* ---- Architecture: stacked process bands, pure HTML like the mockup ---- */
+    .arch { margin-top: 2.5rem; }
+    .arch-band { padding: 1.35rem 1.5rem; }
+    .arch-top { display: flex; align-items: baseline; gap: 0.7rem; flex-wrap: wrap; }
+    .arch-tag {
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.62rem;
+      font-weight: 600; text-transform: uppercase; letter-spacing: 0.16em; color: var(--accent);
+    }
+    .arch-h { font-size: 0.98rem; font-weight: 600; color: var(--heading); margin: 0; }
+    .arch-p { font-size: 0.86rem; line-height: 1.65; color: var(--muted); margin: 0.55rem 0 0; max-width: 44rem; }
+    .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.9rem; }
+    .chip {
+      font-size: 0.7rem; line-height: 1.4; padding: 0.26rem 0.6rem; border-radius: 999px;
+      border: 1px solid var(--line); background: var(--code-bg); color: var(--muted); white-space: nowrap;
+    }
+    .chip.hot { color: var(--accent-ink); border-color: rgba(200, 137, 78, 0.38); background: rgba(200, 137, 78, 0.10); }
+    /* The bridge between the two processes — the whole point of the split. */
+    .arch-bridge { display: flex; align-items: center; gap: 0.9rem; padding: 0.85rem 0.5rem; }
+    .arch-bridge .rule { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--line), transparent); }
+    .arch-bridge .mid { text-align: center; }
+    .arch-bridge .mid b {
+      display: block; font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      font-size: 0.72rem; font-weight: 500; color: var(--accent-ink);
+    }
+    .arch-bridge .mid span { display: block; font-size: 0.7rem; color: var(--muted); margin-top: 0.2rem; }
+
+    /* ---- Pipeline flow ---- */
+    .flow { display: grid; gap: 0.7rem; margin-top: 2.25rem; }
+    @media (min-width: 640px) { .flow { grid-template-columns: repeat(2, 1fr); } }
+    @media (min-width: 940px) { .flow { grid-template-columns: repeat(5, 1fr); } }
+    .flow-step { padding: 1rem 1.05rem; }
+    .flow-n { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.66rem; color: var(--accent); }
+    .flow-t { font-size: 0.85rem; font-weight: 600; color: var(--heading); margin: 0.4rem 0 0; }
+    .flow-d { font-size: 0.76rem; line-height: 1.55; color: var(--muted); margin: 0.35rem 0 0; }
+
+    /* ---- Enforced module layers ---- */
+    .layers { margin-top: 2.25rem; display: grid; gap: 0.5rem; }
+    .layer { display: grid; grid-template-columns: 2.4rem 1fr; align-items: center; gap: 0.9rem; padding: 0.7rem 0.95rem; }
+    .layer-n { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.72rem; font-weight: 600; color: var(--accent); }
+    .layer .chips { margin-top: 0; }
+
+    /* ---- Engineering stat tiles ---- */
+    .stats { display: grid; gap: 1rem; margin-top: 2.5rem; }
+    @media (min-width: 560px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+    @media (min-width: 900px) { .stats { grid-template-columns: repeat(3, 1fr); } }
+    .stat { padding: 1.25rem 1.35rem; }
+    .stat b { display: block; font-family: 'Fraunces', ui-serif, Georgia, serif; font-size: 1.75rem; font-weight: 500; letter-spacing: -0.02em; color: var(--heading); }
+    .stat span { display: block; font-size: 0.8rem; line-height: 1.6; color: var(--muted); margin-top: 0.35rem; }
+
     footer { border-top: 1px solid var(--line); }
     footer .wrap {
       display: flex; align-items: center; justify-content: space-between;
@@ -248,8 +399,13 @@
   <main>
     <section class="hero wrap">
       <img class="icon" src="icon.png" alt="EasyApply app icon" width="128" height="128" />
-      <h1 class="display">EasyApply</h1>
-      <p class="tagline muted">Every job worth applying to — Munich and remote<br />Europe — in one fast feed.</p>
+      <span class="kicker"><span class="pulse"></span>Local LLM · 100% on-device</span>
+      <h1>
+        <span class="wordmark">EasyApply</span>
+        <span class="claim display">An AI agent</span>
+        <span class="claim-sub display">that reads your job alerts — on your own Mac.</span>
+      </h1>
+      <p class="tagline muted">A local LLM classifies every email, extracts the real postings, and merges them with six official job APIs into one deduplicated, newest-first feed.</p>
 
       <button class="brew" id="copy-brew" type="button" aria-label="Copy install command">
         <span><span class="c">$ </span>brew install --cask souhaibbenfarhat/tap/easyapply</span>
@@ -266,97 +422,420 @@
             <span style="background:#febc2e"></span>
             <span style="background:#28c840"></span>
           </span>
-          <span class="win-title">EasyApply</span>
-          <span class="win-sync">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M21 12a9 9 0 1 1-2.9-6.6" />
-              <path d="M21 3v5h-5" />
-            </svg>
-            Synced 2 min ago
+          <span class="win-title">Feed</span>
+          <span class="win-actions">
+            <span class="wb on">
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" /></svg>
+              AI on
+            </span>
+            <span class="wb ico" title="Agent activity">
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4" /></svg>
+            </span>
+            <span class="wb ico" title="Pause">
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 5v14M15 5v14" /></svg>
+            </span>
+            <span class="wb ico" title="Stop">
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="1.5" /></svg>
+            </span>
           </span>
         </div>
         <div class="win-body">
           <nav class="win-side">
             <span class="side-item active">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-                <path d="M4 6h16M4 12h16M4 18h10" />
-              </svg>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10" /></svg>
               Feed <span class="count">128</span>
             </span>
             <span class="side-item">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect x="3" y="4" width="5" height="16" rx="1" />
-                <rect x="10" y="4" width="5" height="10" rx="1" />
-                <rect x="17" y="4" width="5" height="7" rx="1" />
-              </svg>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="5" height="16" rx="1" /><rect x="10" y="4" width="5" height="10" rx="1" /><rect x="17" y="4" width="5" height="7" rx="1" /></svg>
               Tracker <span class="count">7</span>
             </span>
             <span class="side-item">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
-              </svg>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0z" /><path d="M12 18v4" /></svg>
               Sources
             </span>
             <span class="side-item">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-                <path d="M4 8h8M18 8h2M4 16h2M12 16h8" />
-                <circle cx="15" cy="8" r="2" />
-                <circle cx="9" cy="16" r="2" />
-              </svg>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 8h8M18 8h2M4 16h2M12 16h8" /><circle cx="15" cy="8" r="2" /><circle cx="9" cy="16" r="2" /></svg>
               Settings
             </span>
           </nav>
+
           <div class="win-feed">
-            <div class="feed-bar"><span>128 jobs · newest first</span><span>Munich + Remote EU</span></div>
-            <div class="job">
-              <div class="job-x">
-                <p class="job-t">Senior Frontend Engineer (m/w/d)</p>
-                <p class="job-m">BAUHAUS AG · München · 2h ago</p>
-              </div>
-              <span class="b">Hybrid</span>
+            <div class="feed-bar">
+              <span class="tabs"><i class="on">All</i><i>On-site</i><i>Hybrid</i><i>Remote</i></span>
+              <span>128 jobs</span>
             </div>
+
+            <div class="job">
+              <div class="job-t">
+                <p>Senior Frontend Engineer (m/w/d)</p>
+              </div>
+              <p class="job-m">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z" /><circle cx="12" cy="10" r="2.5" /></svg>
+                Munich · Hybrid
+              </p>
+              <p class="job-m">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0z" /><path d="M12 18v4" /></svg>
+                Arbeitnow · BAUHAUS AG <span class="r">2h ago</span>
+              </p>
+            </div>
+
+            <div class="job">
+              <div class="job-t">
+                <p>Staff Frontend Engineer</p>
+              </div>
+              <p class="job-m">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z" /><circle cx="12" cy="10" r="2.5" /></svg>
+                Europe · Remote
+              </p>
+              <p class="job-m">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0z" /><path d="M12 18v4" /></svg>
+                Himalayas · Nordhealth <span class="r">3h ago</span>
+              </p>
+            </div>
+
             <div class="job sel">
-              <div class="job-x">
-                <p class="job-t">Staff Frontend Engineer</p>
-                <p class="job-m">Nordhealth · Remote (EU) · 3h ago</p>
+              <div class="job-t">
+                <p>Lead Software Engineer</p>
+                <span class="b ok">Applied</span>
               </div>
-              <span class="b copper">€75k–€95k</span>
+              <p class="job-m">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z" /><circle cx="12" cy="10" r="2.5" /></svg>
+                Munich · On-site
+              </p>
+              <p class="job-m">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" /></svg>
+                LinkedIn · CHECK24 <span class="r">4h ago</span>
+              </p>
+              <p class="job-s">€110k–€130k</p>
+            </div>
+
+            <div class="job">
+              <div class="job-t">
+                <p>Senior Backend Engineer</p>
+              </div>
+              <p class="job-m">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z" /><circle cx="12" cy="10" r="2.5" /></svg>
+                Worldwide · Remote
+              </p>
+              <p class="job-m">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0z" /><path d="M12 18v4" /></svg>
+                WeWorkRemotely · Automattic <span class="r">5h ago</span>
+              </p>
             </div>
             <div class="job">
-              <div class="job-x">
-                <p class="job-t">Senior Backend Engineer</p>
-                <p class="job-m">Automattic · Worldwide · 5h ago · via WeWorkRemotely</p>
+              <div class="job-t">
+                <p>Frontend Engineer</p>
               </div>
-              <span class="b">Remote</span>
+              <p class="job-m"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z" /><circle cx="12" cy="10" r="2.5" /></svg>
+                Germany · Remote
+              </p>
+              <p class="job-m"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0z" /><path d="M12 18v4" /></svg>
+                Arbeitnow · Solaris <span class="r">7h ago</span>
+              </p>
             </div>
             <div class="job">
-              <div class="job-x">
-                <p class="job-t">Fullstack Developer (m/w/d)</p>
-                <p class="job-m">CHECK24 · München · 6h ago</p>
+              <div class="job-t">
+                <p>Senior Platform Engineer (m/w/d)</p>
               </div>
-              <span class="b">On-site</span>
-            </div>
-            <div class="job">
-              <div class="job-x">
-                <p class="job-t">Frontend Engineer</p>
-                <p class="job-m">Solaris · Remote (DE) · 9h ago · via Arbeitnow</p>
-              </div>
+              <p class="job-m"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z" /><circle cx="12" cy="10" r="2.5" /></svg>
+                Munich · Hybrid
+              </p>
+              <p class="job-m"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0z" /><path d="M12 18v4" /></svg>
+                Arbeitsagentur · Siemens <span class="r">9h ago</span>
+              </p>
             </div>
           </div>
+
           <div class="win-detail">
-            <p class="det-t">Staff Frontend Engineer</p>
-            <p class="det-m">Nordhealth · Remote (EU) · full-time</p>
-            <p class="det-s">€75k–€95k</p>
-            <span class="det-apply">Apply ↗</span>
-            <p class="det-via">via Himalayas ↗</p>
+            <p class="det-t">Lead Software Engineer</p>
+            <p class="det-m">CHECK24 · Munich · posted 4 hours ago</p>
+            <div class="det-badges">
+              <span class="b" style="margin-left:0">On-site</span>
+              <span class="b" style="margin-left:0">Munich</span>
+              <span class="det-s">€110k–€130k</span>
+            </div>
+            <div class="det-row">
+              <span class="det-apply">Open application ↗</span>
+              <span class="det-btn">Interested</span>
+              <span class="det-btn on">Applied</span>
+              <span class="det-btn">Interview</span>
+            </div>
+            <p class="det-note">Notes — reached out to the hiring manager on Tuesday.</p>
             <div class="det-sk" style="margin-top:0.35rem"></div>
-            <div class="det-sk" style="width:92%"></div>
-            <div class="det-sk" style="width:76%"></div>
+            <div class="det-sk" style="width:94%"></div>
+            <div class="det-sk" style="width:88%"></div>
+            <div class="det-sk" style="width:96%"></div>
+            <div class="det-sk" style="width:72%"></div>
+            <div class="det-sk" style="width:90%"></div>
+            <div class="det-sk" style="width:64%"></div>
+            <p class="det-via" style="margin-top:auto">✦ found by the inbox agent · via LinkedIn ↗</p>
+          </div>
+
+          <div class="win-act">
+            <div class="act-head">
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4" /></svg>
+              Agent activity
+            </div>
+
+            <div class="funnel">
+              <div class="fn-top">
+                Pipeline
+                <span class="n">42 / 200</span>
+                <span class="tr"><b>‖</b><b>■</b></span>
+              </div>
+              <div class="bar"><i></i></div>
+              <div class="fn-now">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></svg>
+                <span>Munich — 12 new roles</span>
+              </div>
+              <div class="fn-grid">
+                <span><i class="dot" style="background:#7ec8a0"></i>Accepted <b>18</b></span>
+                <span><i class="dot" style="background:#5b6b76"></i>Rejected <b>24</b></span>
+                <span><i class="dot" style="background:#4a90c2"></i>Found <b>31</b></span>
+                <span><i class="dot" style="background:#7ec8a0"></i>Kept <b>27</b></span>
+              </div>
+            </div>
+
+            <div class="legend">
+              <span><i class="dot" style="background:#7ec8a0"></i>jobs found</span>
+              <span><i class="dot" style="background:#5b6b76"></i>no jobs</span>
+              <span><i class="dot" style="background:#4a90c2"></i>step</span>
+              <span><i class="dot" style="background:#c8894e"></i>model</span>
+            </div>
+
+            <div class="tl">
+              <div class="tl-row"><i class="dot" style="background:#4a90c2"></i><span class="txt">Scanning 200 email(s)</span></div>
+              <div class="tl-row"><i class="dot" style="background:#7ec8a0"></i><span class="txt">Backend roles for you</span><span class="v ok">2 jobs</span></div>
+              <div class="tl-row"><i class="dot" style="background:#5b6b76"></i><span class="txt">Weekly newsletter</span><span class="v">no jobs</span></div>
+              <div class="tl-row"><i class="dot" style="background:#c8894e"></i><span class="txt">Prompt · 4,812 chars</span></div>
+              <div class="tl-row"><i class="dot" style="background:#c8894e"></i><span class="txt">Thinking · 2,477 chars</span></div>
+              <div class="tl-row"><i class="dot" style="background:#7ec8a0"></i><span class="txt">Munich — 12 new roles</span><span class="v ok">4 jobs</span></div>
+              <div class="tl-row"><i class="dot" style="background:#5b6b76"></i><span class="txt">Your application was sent</span><span class="v">no jobs</span></div>
+              <div class="tl-row"><i class="dot" style="background:#c8894e"></i><span class="txt">Prompt · 6,104 chars</span></div>
+              <div class="tl-row"><span class="spin"><i class="dot" style="background:#4a90c2"></i></span><span class="txt">Analyzing "Frontend roles…"</span></div>
+            </div>
           </div>
         </div>
       </div>
-      <p class="mock-caption">The feed — six sources, one deduplicated list, salary where it's stated. Not a screenshot: pure HTML.</p>
+      <p class="mock-caption">The real layout — feed, detail, and the agent working through your inbox on the right. Not a screenshot: pure HTML.</p>
+
+      <div class="diagram">
+        <div class="diagram-scroll">
+          <svg viewBox="0 0 1200 520" role="img" aria-labelledby="dg-title dg-desc">
+            <title id="dg-title">EasyApply architecture</title>
+            <desc id="dg-desc">Two ingestion lanes — a Gmail job-alert inbox classified by a local LLM agent, and six official job APIs validated with zod — converge into cross-source dedupe and a local PGlite database, which the React renderer reads over a typed IPC bridge and renders as a feed and a live agent timeline.</desc>
+
+            <defs>
+              <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" class="dg-arrow" />
+              </marker>
+              <marker id="ahh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" class="dg-arrow-hot" />
+              </marker>
+              <filter id="soft" x="-60%" y="-60%" width="220%" height="220%">
+                <feGaussianBlur stdDeviation="10" />
+              </filter>
+            </defs>
+
+            <!-- ============ frames ============ -->
+            <text class="dg-frame-label" x="20" y="36">SOURCES</text>
+            <rect class="dg-frame" x="232" y="45" width="636" height="425" rx="14" />
+            <text class="dg-frame-label" x="244" y="36">MAIN PROCESS · NODE</text>
+            <rect class="dg-frame" x="886" y="45" width="306" height="425" rx="14" />
+            <text class="dg-frame-label" x="898" y="36">RENDERER · REACT</text>
+
+            <!-- the bridge that the whole design turns on -->
+            <line class="dg-frame" x1="877" y1="45" x2="877" y2="470" />
+            <text class="dg-lab" transform="translate(872,375) rotate(-90)">TYPED IPC · IpcResult&lt;T&gt; · errors are values</text>
+
+            <!-- ============ lane A — the inbox agent ============ -->
+            <text class="dg-lane-hot" x="20" y="98">◆ AGENTIC LANE · ON-DEVICE LLM</text>
+            <rect class="dg-node-hot" x="20" y="110" width="165" height="80" rx="12" />
+            <g class="dg-ico" transform="translate(38,130)">
+              <rect x="0" y="0" width="18" height="13" rx="2.5" />
+              <path d="M0 2l9 6 9-6" />
+            </g>
+            <text class="dg-t" x="38" y="163">Job-alert inbox</text>
+            <text class="dg-s" x="38" y="179">Gmail · IMAP + app password</text>
+
+            <!-- The agent — deliberately the loudest node on the canvas: it is
+                 what makes this an agentic app rather than an aggregator. -->
+            <rect class="dg-glow" x="245" y="96" width="165" height="108" rx="16" fill="#c8894e" filter="url(#soft)" />
+            <rect class="dg-node-hot" x="245" y="96" width="165" height="108" rx="14" stroke-width="1.6" />
+
+            <!-- silicon + spark: on-device intelligence, readable at a glance -->
+            <g transform="translate(264,110)">
+              <rect class="dg-ai" x="5" y="5" width="20" height="20" rx="5.5" />
+              <rect class="dg-ai" x="10.5" y="10.5" width="9" height="9" rx="2.5" />
+              <path class="dg-ai" d="M12 5V1.5M18 5V1.5M12 29v-3.5M18 29v-3.5M5 12H1.5M5 18H1.5M29 12h-3.5M29 18h-3.5" />
+            </g>
+            <path class="dg-spark dg-spark-a" d="M303 106l1.5 4.1 4.1 1.5-4.1 1.5-1.5 4.1-1.5-4.1-4.1-1.5 4.1-1.5z" />
+            <path class="dg-spark dg-spark-b" d="M312 118l.9 2.4 2.4.9-2.4.9-.9 2.4-.9-2.4-2.4-.9 2.4-.9z" />
+
+            <rect class="dg-badge" x="358" y="106" width="38" height="18" rx="9" />
+            <text class="dg-badge-t" x="377" y="119" text-anchor="middle">AI</text>
+
+            <text class="dg-t" x="264" y="172">Local LLM agent</text>
+            <text class="dg-s" x="264" y="189">llama.cpp · your model</text>
+
+            <rect class="dg-node-hot" x="470" y="110" width="175" height="80" rx="12" />
+            <g class="dg-ico" transform="translate(488,130)">
+              <path d="M6 1H2v13h12V6" /><path d="M9 1l5 5H9z" /><path d="M4.5 10h6" />
+            </g>
+            <text class="dg-t" x="488" y="163">Extract + harness</text>
+            <text class="dg-s" x="488" y="179">JSON → needs an apply link</text>
+
+            <!-- ============ lane B — the official APIs ============ -->
+            <text class="dg-lane" x="20" y="278">API LANE · SIX OFFICIAL BOARDS</text>
+            <rect class="dg-node" x="20" y="290" width="165" height="80" rx="12" />
+            <g class="dg-ico-n" transform="translate(38,310)">
+              <circle cx="8" cy="7" r="7" /><path d="M1 7h14M8 0a11 11 0 0 1 0 14M8 0a11 11 0 0 0 0 14" />
+            </g>
+            <text class="dg-t" x="38" y="343">6 official APIs</text>
+            <text class="dg-xs" x="38" y="358">BA · Adzuna · Arbeitnow · +3</text>
+
+            <rect class="dg-node" x="245" y="290" width="165" height="80" rx="12" />
+            <g class="dg-ico-n" transform="translate(263,310)">
+              <path d="M8 1l6 2.5v5c0 3.2-2.6 5-6 5.5-3.4-.5-6-2.3-6-5.5v-5z" /><path d="M5.5 7.5l2 2 3.5-3.5" />
+            </g>
+            <text class="dg-t" x="263" y="343">zod at the boundary</text>
+            <text class="dg-xs" x="263" y="358">schema drift = failing test</text>
+
+            <rect class="dg-node" x="470" y="290" width="175" height="80" rx="12" />
+            <g class="dg-ico-n" transform="translate(488,310)">
+              <path d="M1 4h14M1 8h14M1 12h9" />
+            </g>
+            <text class="dg-t" x="488" y="343">Normalize + classify</text>
+            <text class="dg-xs" x="488" y="358">six shapes → one job model</text>
+
+            <!-- ============ merge ============ -->
+            <rect class="dg-node" x="700" y="185" width="155" height="110" rx="12" />
+            <g class="dg-ico-n" transform="translate(718,205)">
+              <ellipse cx="8" cy="3.5" rx="7" ry="3" /><path d="M1 3.5v7c0 1.7 3.1 3 7 3s7-1.3 7-3v-7" />
+            </g>
+            <text class="dg-t" x="718" y="238">Dedupe → store</text>
+            <text class="dg-xs" x="718" y="254">one row per role, across</text>
+            <text class="dg-xs" x="718" y="267">every source</text>
+            <text class="dg-hot" x="718" y="284">PGlite — Postgres in WASM</text>
+
+            <!-- ============ edges ============ -->
+            <line class="dg-edge-hot" x1="185" y1="150" x2="240" y2="150" marker-end="url(#ahh)" />
+            <text class="dg-lab" x="212" y="142" text-anchor="middle">IMAP</text>
+            <line class="dg-edge-hot" x1="410" y1="150" x2="465" y2="150" marker-end="url(#ahh)" />
+            <text class="dg-lab" x="437" y="142" text-anchor="middle">classify</text>
+            <path class="dg-edge-hot" d="M645,150 C 672,150 676,215 695,215" marker-end="url(#ahh)" />
+
+            <line class="dg-edge" x1="185" y1="330" x2="240" y2="330" marker-end="url(#ah)" />
+            <text class="dg-lab" x="212" y="322" text-anchor="middle">polite</text>
+            <line class="dg-edge" x1="410" y1="330" x2="465" y2="330" marker-end="url(#ah)" />
+            <text class="dg-lab" x="437" y="322" text-anchor="middle">validated</text>
+            <path class="dg-edge" d="M645,330 C 672,330 676,265 695,265" marker-end="url(#ah)" />
+
+            <line class="dg-edge" x1="855" y1="240" x2="895" y2="240" marker-end="url(#ah)" />
+
+            <!-- ============ renderer — the real window, in miniature ============ -->
+            <rect class="dg-node" x="900" y="70" width="278" height="380" rx="10" />
+            <line class="dg-frame" x1="900" y1="98" x2="1178" y2="98" stroke-dasharray="0" />
+            <circle cx="915" cy="84" r="3.5" fill="#ff5f57" />
+            <circle cx="926" cy="84" r="3.5" fill="#febc2e" />
+            <circle cx="937" cy="84" r="3.5" fill="#28c840" />
+            <text class="dg-s" x="950" y="88" style="font-weight:600">EasyApply</text>
+
+            <text class="dg-frame-label" x="914" y="120">FEED</text>
+
+            <rect class="dg-well" x="910" y="130" width="258" height="40" rx="7" />
+            <text class="dg-s" x="922" y="147" style="font-weight:600">Senior Frontend Engineer (m/w/d)</text>
+            <text class="dg-xs" x="922" y="161">Munich · Hybrid · BAUHAUS AG</text>
+
+            <rect class="dg-node-hot" x="910" y="176" width="258" height="40" rx="7" />
+            <rect x="910" y="176" width="3" height="40" rx="1.5" fill="var(--accent)" />
+            <text class="dg-s" x="922" y="193" style="font-weight:600">Lead Software Engineer</text>
+            <text class="dg-xs" x="922" y="207">Munich · On-site · via inbox agent</text>
+            <text class="dg-hot" x="1156" y="200" text-anchor="end">€110k–€130k</text>
+
+            <rect class="dg-well" x="910" y="222" width="258" height="40" rx="7" />
+            <text class="dg-s" x="922" y="239" style="font-weight:600">Backend Engineer</text>
+            <text class="dg-xs" x="922" y="253">Worldwide · Remote · via LinkedIn alert</text>
+
+            <line class="dg-frame" x1="910" y1="284" x2="1168" y2="284" stroke-dasharray="0" />
+            <text class="dg-frame-label" x="914" y="306">AGENT ACTIVITY</text>
+
+            <circle cx="918" cy="326" r="4" fill="var(--muted)" opacity="0.7" />
+            <text class="dg-xs" x="932" y="330">Scanning 200 new email(s)</text>
+
+            <circle cx="918" cy="352" r="4" fill="#3f9e6b" />
+            <text class="dg-xs" x="932" y="356">Backend roles for you</text>
+            <text class="dg-xs" x="1160" y="356" text-anchor="end" fill="#3f9e6b">2 jobs</text>
+
+            <circle cx="918" cy="378" r="4" fill="var(--muted)" opacity="0.45" />
+            <text class="dg-xs" x="932" y="382">Weekly newsletter</text>
+            <text class="dg-xs" x="1160" y="382" text-anchor="end">no jobs</text>
+
+            <circle cx="918" cy="404" r="4" fill="#c8894e" />
+            <text class="dg-xs" x="932" y="408">Prompt · 4,812 chars</text>
+
+            <!-- the checkpoint being worked on right now -->
+            <circle cx="918" cy="430" r="4" fill="#4a90c2" />
+            <circle cx="918" cy="430" r="7.5" fill="none" stroke="#4a90c2" stroke-width="1.5" stroke-dasharray="26 12" opacity="0.85" />
+            <text class="dg-xs" x="932" y="434">Analyzing "Munich — 12 new roles"</text>
+          </svg>
+        </div>
+        <p class="diagram-caption">
+          Two lanes, one feed. The agent lane classifies your inbox with a local model of your
+          choosing; the API lane pulls six boards inside their published rate limits. Both converge
+          on the same dedupe and the same local database — and the UI only ever reads.
+        </p>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="wrap">
+        <p class="label">The agent</p>
+        <h2 class="display section">The AI runs on your machine. Not in someone else's cloud.</h2>
+        <p class="lede muted">
+          The best roles never reach an API — they land in your inbox as alert emails. So EasyApply
+          points an <strong>agent</strong> at them: it reads each message, decides for itself whether
+          that message holds real job postings, extracts the roles, and discards everything it can't
+          stand behind. It runs on <strong>the local LLM you choose</strong>, through llama.cpp, on
+          your own silicon. <strong>No API key. No token bill. No email ever uploaded.</strong> Turn
+          it off and the RAM comes straight back.
+        </p>
+
+        <div class="flow">
+          <div class="card flow-step">
+            <p class="flow-n">01</p>
+            <p class="flow-t">Read the inbox</p>
+            <p class="flow-d">IMAP over TLS with an app password, encrypted at rest by the OS keychain. Only mail newer than the last scan.</p>
+          </div>
+          <div class="card flow-step">
+            <p class="flow-n">02</p>
+            <p class="flow-t">Strip to text</p>
+            <p class="flow-d">Markup and tracking noise removed — but the anchors are kept, because the apply link is the one thing that must survive.</p>
+          </div>
+          <div class="card flow-step">
+            <p class="flow-n">03</p>
+            <p class="flow-t">Extract</p>
+            <p class="flow-d">Each email gets a fresh 8k-token context, so one message can never bleed into the next. The model returns JSON.</p>
+          </div>
+          <div class="card flow-step">
+            <p class="flow-n">04</p>
+            <p class="flow-t">Harness the output</p>
+            <p class="flow-d">Validated, then anchored on a real link: no title, company, or apply URL and the row is dropped. Hallucinations don't reach the feed.</p>
+          </div>
+          <div class="card flow-step">
+            <p class="flow-n">05</p>
+            <p class="flow-t">Merge</p>
+            <p class="flow-d">The board is inferred from the apply link, deduped against all six APIs, and upserted per email — rows appear while the scan is still running.</p>
+          </div>
+        </div>
+
+        <p class="note" style="max-width:46rem">
+          The run is fully observable: a live funnel of scanned, accepted, and rejected emails,
+          every prompt and response the model saw, transport controls to pause or stop mid-scan,
+          and — for each email — the jobs it actually produced, linked to the original posting so
+          you can check the model's judgement instead of trusting it.
+        </p>
+      </div>
     </section>
 
     <section class="band">
@@ -365,12 +844,21 @@
         <h2 class="display section">Job hunting means six tabs, six logins, and the same posting three times.</h2>
         <p class="lede muted">
           Arbeitsagentur for Munich, four remote boards, Adzuna for the rest — each with its
-          own search, its own noise, and the same role reposted under three names. EasyApply
+          own search, its own noise, and the same role reposted under three names. And the best
+          roles never reach an API at all: they land in your inbox as alert emails. EasyApply
           pulls every source with a real API into one deduplicated, newest-first feed on your
-          Mac, and stays out of your way.
+          Mac — then reads the alert emails too, with a model that never leaves the machine.
         </p>
 
         <div class="features">
+          <div class="card">
+            <h3>An agent reads your job alerts</h3>
+            <p>LinkedIn and StepStone alerts hold inventory no API exposes. An agentic classifier reads each email, judges whether it holds real postings, extracts them, and merges them into the same feed — on the local model you pick, so your mail never leaves the Mac.</p>
+          </div>
+          <div class="card">
+            <h3>Every decision is inspectable</h3>
+            <p>A live panel shows each email the agent scanned, the prompt and reasoning behind its verdict, and the jobs it kept — linked to the original posting. Pause or stop it mid-run. An agent you can audit, not a black box.</p>
+          </div>
           <div class="card">
             <h3>One feed, not six tabs</h3>
             <p>Arbeitsagentur, Adzuna, Arbeitnow, Himalayas, RemoteOK, WeWorkRemotely — official APIs and feeds only, no scraping. Cross-source duplicates collapse into a single row.</p>
@@ -400,7 +888,8 @@
             <li><span class="n">1.</span><span>Sync — the main process fetches each source on an interval, one at a time, inside its published rate limits.</span></li>
             <li><span class="n">2.</span><span>Normalize + dedupe — six response shapes become one job model, and the same role from two boards collapses into one row.</span></li>
             <li><span class="n">3.</span><span>Local PGlite — everything lands in a Postgres-in-a-file on your disk. Nothing leaves the machine except the API requests themselves.</span></li>
-            <li><span class="n">4.</span><span>You apply — every posting links out to the original source. Set a status, add a note, move on.</span></li>
+            <li><span class="n">4.</span><span>Read the inbox — a local agent classifies each job-alert email, extracts the postings it can verify, and merges them into the same feed. The mail never leaves your Mac.</span></li>
+            <li><span class="n">5.</span><span>You apply — every posting links out to the original source. Set a status, add a note, move on.</span></li>
           </ol>
           <p class="note">No accounts, no cloud, no telemetry. Your statuses and notes never sync anywhere.</p>
         </div>
@@ -411,11 +900,155 @@
           <dl class="specs card">
             <div><dt>Version</dt><dd>0.1.0</dd></div>
             <div><dt>Platform</dt><dd>macOS 14+ · Apple Silicon</dd></div>
-            <div><dt>Sources</dt><dd>6 — official APIs &amp; feeds</dd></div>
-            <div><dt>Built with</dt><dd>Electron · React · PGlite</dd></div>
+            <div><dt>Sources</dt><dd>6 official APIs + your inbox</dd></div>
+            <div><dt>Built with</dt><dd>Electron · React 19 · PGlite</dd></div>
+            <div><dt>Local agent</dt><dd>llama.cpp · your model · optional</dd></div>
             <div><dt>License</dt><dd>MIT — open source</dd></div>
             <div><dt>Distribution</dt><dd>Homebrew tap · GitHub Releases</dd></div>
           </dl>
+        </div>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="wrap">
+        <p class="label">Architecture</p>
+        <h2 class="display section">Two processes, one typed contract between them.</h2>
+        <p class="lede muted">
+          Job boards don't send CORS headers, and some reject non-browser clients outright — so
+          unlike a web app, <strong>nothing is fetched from the UI</strong>. Every network call,
+          parse, and write happens in the Electron main process; the renderer is a pure read/act
+          client over a hand-typed bridge. That one inversion is what makes a strict
+          <code>connect-src 'self'</code> policy free rather than aspirational.
+        </p>
+
+        <div class="arch">
+          <div class="card arch-band">
+            <div class="arch-top">
+              <span class="arch-tag">Renderer</span>
+              <h3 class="arch-h">React 19 · read &amp; act, never fetch</h3>
+            </div>
+            <p class="arch-p">
+              TanStack Query is the single source of truth for all UI state — no Redux, no Zustand,
+              no context stores. Writes go through named mutations with optimistic patches and
+              rollback; the local database is the cache, so job rows are never dehydrated to
+              localStorage.
+            </p>
+            <div class="chips">
+              <span class="chip">TanStack Query</span>
+              <span class="chip">TanStack Router</span>
+              <span class="chip">Virtualized feed</span>
+              <span class="chip">22 ui-kit components</span>
+              <span class="chip">OKLCH design tokens</span>
+              <span class="chip hot">0 network calls</span>
+            </div>
+          </div>
+
+          <div class="arch-bridge">
+            <span class="rule"></span>
+            <span class="mid">
+              <b>window.electron → IpcResult&lt;T&gt;</b>
+              <span>15 typed channels · errors are values, never thrown across the bridge</span>
+            </span>
+            <span class="rule"></span>
+          </div>
+
+          <div class="card arch-band">
+            <div class="arch-top">
+              <span class="arch-tag">Main process</span>
+              <h3 class="arch-h">Fetch · validate · normalize · dedupe · store</h3>
+            </div>
+            <p class="arch-p">
+              A scheduler drives a sequential sync engine over seven provider plugins — one file
+              each, with its own politeness budget declared in code rather than prose. Every
+              response is validated at the boundary, so a board silently renaming a field is a
+              failing test, not a 3 a.m. crash. One provider failing records its error and the
+              other six still land.
+            </p>
+            <div class="chips">
+              <span class="chip">Sequential + rate-limited</span>
+              <span class="chip">zod at every boundary</span>
+              <span class="chip">Cross-source dedupe</span>
+              <span class="chip">PGlite — Postgres in WASM</span>
+              <span class="chip">Drizzle migrations</span>
+              <span class="chip hot">llama.cpp on-device</span>
+            </div>
+          </div>
+        </div>
+
+        <p class="note" style="max-width:46rem">
+          PGlite deliberately replaces a native SQLite binding: no ABI to rebuild against each
+          Electron release, and the test suite runs the very same engine in memory — so
+          repositories are tested against real Postgres, not a mock.
+        </p>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="wrap">
+        <p class="label">Engineering</p>
+        <h2 class="display section">The boundaries are compiler-enforced, not documented.</h2>
+        <p class="lede muted">
+          Twelve modules sit in five layers, and an illegal import is a lint error that fails the
+          build — not a convention someone eventually violates. UI and data can never import each
+          other; feature modules can never import each other; only the app layer composes them.
+        </p>
+
+        <div class="layers">
+          <div class="card layer">
+            <span class="layer-n">L0</span>
+            <span class="chips"><span class="chip">logger</span></span>
+          </div>
+          <div class="card layer">
+            <span class="layer-n">L1</span>
+            <span class="chips">
+              <span class="chip">ui-kit</span><span class="chip">data</span>
+              <span class="chip">sources</span><span class="chip">persistence</span>
+            </span>
+          </div>
+          <div class="card layer">
+            <span class="layer-n">L2</span>
+            <span class="chips"><span class="chip">test-utils</span></span>
+          </div>
+          <div class="card layer">
+            <span class="layer-n">L3</span>
+            <span class="chips">
+              <span class="chip">feed</span><span class="chip">tracker</span>
+              <span class="chip">sources-page</span><span class="chip">settings</span>
+              <span class="chip">shell</span>
+            </span>
+          </div>
+          <div class="card layer">
+            <span class="layer-n">L4</span>
+            <span class="chips"><span class="chip hot">app — the only composer</span></span>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="card stat">
+            <b>725</b>
+            <span>tests across 99 files, with an 85% coverage floor and 90% required on every changed line in CI.</span>
+          </div>
+          <div class="card stat">
+            <b>3</b>
+            <span>TypeScript projects — main, renderer, and shared — with <code>isolatedDeclarations</code> forcing an explicit type on every export.</span>
+          </div>
+          <div class="card stat">
+            <b>7</b>
+            <span>source plugins behind one contract. Adding a board touches one file, one fixture, one test — nothing else.</span>
+          </div>
+          <div class="card stat">
+            <b>0</b>
+            <span>runtime dependencies fetched by the UI, and no telemetry anywhere. The strict CSP costs nothing because there is nothing to allow.</span>
+          </div>
+          <div class="card stat">
+            <b>100%</b>
+            <span>of provider tests run against captured live responses, so schema drift on a real board fails locally before it ever ships.</span>
+          </div>
+          <div class="card stat">
+            <b>1</b>
+            <span>command to install, and a release pipeline that builds the dmg and bumps the Homebrew cask with no manual steps.</span>
+          </div>
         </div>
       </div>
     </section>
