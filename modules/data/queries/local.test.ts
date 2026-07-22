@@ -1,10 +1,14 @@
 import { renderHook, waitFor } from '@test-utils'
 import {
+  DEFAULT_PANEL_WIDTHS,
   FEED_FILTERS_STORAGE_KEY,
   LAST_FEED_VISIT_STORAGE_KEY,
+  PANEL_WIDTHS_STORAGE_KEY,
   readStoredFeedFilters,
+  readStoredPanelWidths,
   useLastFeedVisit,
   useStoredFeedFilters,
+  useStoredPanelWidths,
 } from './local'
 
 describe('useLastFeedVisit', () => {
@@ -69,5 +73,37 @@ describe('useStoredFeedFilters', () => {
     localStorage.setItem(FEED_FILTERS_STORAGE_KEY, JSON.stringify({ hasSalary: true }))
     const { result } = renderHook(() => useStoredFeedFilters())
     expect(result.current.data).toEqual({ hasSalary: true })
+  })
+})
+
+describe('readStoredPanelWidths', () => {
+  it('returns the defaults when nothing is stored', () => {
+    expect(readStoredPanelWidths()).toEqual(DEFAULT_PANEL_WIDTHS)
+  })
+
+  it('keeps valid numbers and falls back per-field for garbage', () => {
+    localStorage.setItem(
+      PANEL_WIDTHS_STORAGE_KEY,
+      JSON.stringify({ jobs: 500, activity: 'very wide' }),
+    )
+    expect(readStoredPanelWidths()).toEqual({
+      jobs: 500,
+      activity: DEFAULT_PANEL_WIDTHS.activity,
+    })
+  })
+
+  it('falls back on malformed or non-object storage', () => {
+    localStorage.setItem(PANEL_WIDTHS_STORAGE_KEY, 'not json')
+    expect(readStoredPanelWidths()).toEqual(DEFAULT_PANEL_WIDTHS)
+    localStorage.setItem(PANEL_WIDTHS_STORAGE_KEY, 'null')
+    expect(readStoredPanelWidths()).toEqual(DEFAULT_PANEL_WIDTHS)
+  })
+})
+
+describe('useStoredPanelWidths', () => {
+  it('exposes the stored widths without a loading flash', () => {
+    localStorage.setItem(PANEL_WIDTHS_STORAGE_KEY, JSON.stringify({ jobs: 500, activity: 300 }))
+    const { result } = renderHook(() => useStoredPanelWidths())
+    expect(result.current.data).toEqual({ jobs: 500, activity: 300 })
   })
 })
