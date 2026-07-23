@@ -3,17 +3,44 @@ import { useAgentState, useAgentTrace, usePauseAgent, useResumeAgent, useStopAge
 import { Button, cn, ScrollArea } from '@ui-kit'
 import { Activity, Brain, ChevronRight, Play, X } from 'lucide-react'
 import { type ReactElement, useState } from 'react'
+import { formatElapsedClock, formatTraceDuration } from './format-duration'
+import { useElapsedSince } from './hooks/use-elapsed-since'
 import { PipelineFunnel } from './PipelineFunnel'
 import { TraceDot, TraceLegend } from './TraceDot'
 import { TraceJobs } from './TraceJobs'
 
-// The most recent funnel snapshot, if any 'pipeline' event has arrived.
-function latestStats(events: AgentTraceEvent[]): AgentPipelineStats | null {
+// The most recent funnel snapshot, if any 'pipeline' event has arrived — with
+// the event's timestamp, which is the current step's start (during the slow
+// LLM call the newest stats event is the email's own 'Analyzing' row).
+function latestStats(events: AgentTraceEvent[]): { stats: AgentPipelineStats; at: string } | null {
   for (let i = events.length - 1; i >= 0; i -= 1) {
-    const stats = events[i]?.stats
-    if (stats !== undefined) return stats
+    const event = events[i]
+    if (event?.stats !== undefined) return { stats: event.stats, at: event.at }
   }
   return null
+}
+
+// The timing slot at the right edge of a row, safe from label truncation.
+// A completed step shows its main-stamped duration ("12s"); the in-flight step
+// shows a live stopwatch since its main-stamped start ("0:42"), ticking every
+// second — distinct shapes, so a running count never reads as a final figure.
+// The counter stops with `active`: a held (paused) run counts nothing.
+function TraceTimer({
+  event,
+  active,
+}: {
+  event: AgentTraceEvent
+  active: boolean
+}): ReactElement | null {
+  const runningMs = useElapsedSince(event.at, active && event.durationMs === undefined)
+  const text =
+    event.durationMs !== undefined
+      ? formatTraceDuration(event.durationMs)
+      : runningMs === null
+        ? ''
+        : formatElapsedClock(runningMs)
+  if (text === '') return null
+  return <span className="shrink-0 text-[0.65rem] tabular-nums text-foreground-subtle">{text}</span>
 }
 
 function TimelineRow({
@@ -85,6 +112,7 @@ function TimelineRow({
               {verdict}
             </span>
           ) : null}
+          <TraceTimer event={event} active={active} />
         </div>
         {/* What this email actually produced — the agent's work, auditable. */}
         {event.jobs !== undefined ? <TraceJobs jobs={event.jobs} /> : null}
@@ -127,6 +155,7 @@ function ExpandableRow({
           </span>
           {isThinking ? <Brain className="size-3 shrink-0" /> : null}
           <span className="min-w-0 flex-1 truncate">{event.label}</span>
+          <TraceTimer event={event} active={active} />
           <ChevronRight
             className={cn('size-3 shrink-0 transition-transform', open && 'rotate-90')}
           />
@@ -172,7 +201,7 @@ export function AgentTimeline({ onClose, onStart, width = 320 }: AgentTimelinePr
   const resume = useResumeAgent()
   const state = useAgentState().data ?? 'idle'
   const events = trace.data ?? []
-  const stats = latestStats(events)
+  const funnel = latestStats(events)
 
   return (
     // Secondary sidebar (§sidebars): body `background`; header + footer one step
@@ -199,9 +228,10 @@ export function AgentTimeline({ onClose, onStart, width = 320 }: AgentTimelinePr
           <X />
         </Button>
       </div>
-      {stats !== null ? (
+      {funnel !== null ? (
         <PipelineFunnel
-          stats={stats}
+          stats={funnel.stats}
+          stepStartedAt={funnel.at}
           state={state}
           onStop={() => stop.mutate()}
           onPause={() => pause.mutate()}
@@ -240,8 +270,8 @@ export function AgentTimeline({ onClose, onStart, width = 320 }: AgentTimelinePr
         </div>
       </ScrollArea>
       <footer className="label-caps shrink-0 border-t border-border bg-surface-hover px-3 py-2">
-        {stats !== null
-          ? `${stats.jobsKept} job${stats.jobsKept === 1 ? '' : 's'} · ${stats.emailsProcessed}/${stats.emailsTotal} emails`
+        {funnel !== null
+          ? `${funnel.stats.jobsKept} job${funnel.stats.jobsKept === 1 ? '' : 's'} · ${funnel.stats.emailsProcessed}/${funnel.stats.emailsTotal} emails`
           : events.length === 0
             ? 'Idle'
             : `${events.length} checkpoint${events.length === 1 ? '' : 's'}`}

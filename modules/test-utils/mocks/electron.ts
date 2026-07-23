@@ -180,7 +180,8 @@ function applyFeedFilters(rows: StoredJob[], filters: FeedFilters): StoredJob[] 
   })
   out = out.toSorted(feedOrder)
   const offset = filters.offset ?? 0
-  return out.slice(offset, offset + (filters.limit ?? 200))
+  // Mirrors listFeed: no default cap — an absent limit means the whole set.
+  return filters.limit === undefined ? out.slice(offset) : out.slice(offset, offset + filters.limit)
 }
 
 // sync.onEvent subscribers, keyed by the mock's sync namespace object (not

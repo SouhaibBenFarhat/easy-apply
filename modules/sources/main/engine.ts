@@ -8,6 +8,7 @@ import {
   upsertProviderState,
 } from '@persistence/main'
 import type { SearchProfile, SourceId } from '@sources/shared'
+import { describeError } from '@sources/shared'
 import type { PoliteHttpClient } from './http'
 import type { MailAccount, MailDriver } from './mail'
 import type { LlmClient } from './mail-extract'
@@ -200,7 +201,7 @@ export async function runSync(
         error: null,
       })
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
+      const message = describeError(error)
       await finishSyncRun(db, runId, { ok: false, error: message })
       // Failed attempts still consume the politeness window — a hard-failing
       // API shouldn't be hammered again on every scheduler tick, so
@@ -216,6 +217,16 @@ export async function runSync(
         skipped: false,
       })
       logger.error(`${meta.id}: sync failed — ${message}`)
+      // Surface the failure in the agent timeline too — without this row a
+      // crashed provider looks like a run that quietly finished (the error
+      // only reached sync_runs / the Sources page, not the panel being
+      // watched). The label's "failed" tones the dot red; the body carries the
+      // full error as an expandable row.
+      deps.trace?.({
+        channel: 'sync',
+        label: `${meta.displayName} failed — sync aborted for this source`,
+        body: message,
+      })
       emit({
         type: 'source:finished',
         sourceId: meta.id,

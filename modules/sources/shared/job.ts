@@ -26,6 +26,8 @@ export type SourceId =
   | 'indeed'
   | 'stepstone'
   | 'xing'
+  | 'glassdoor'
+  | 'instaffo'
 
 export const SOURCE_IDS: readonly SourceId[] = [
   'ba',
@@ -43,6 +45,8 @@ export const SOURCE_IDS: readonly SourceId[] = [
   'indeed',
   'stepstone',
   'xing',
+  'glassdoor',
+  'instaffo',
 ]
 
 // The email-agent sources: jobs the on-device LLM extracted from the user's
@@ -54,6 +58,8 @@ export const MAILBOX_SOURCE_IDS: readonly SourceId[] = [
   'indeed',
   'stepstone',
   'xing',
+  'glassdoor',
+  'instaffo',
 ]
 
 // Where a job came from: the inbox agent (LLM email extraction) or a source API.

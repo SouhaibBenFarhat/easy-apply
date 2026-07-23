@@ -78,7 +78,8 @@ export function installSync(db: AppDatabase, modelManager: ModelManager): () => 
   }
 
   // Live agent-activity trace for the header monitor: stamp seq/at and push to
-  // every window over 'agent:trace'.
+  // every window over 'agent:trace'. seq restarts at 0 for every pass — the
+  // renderer's collector treats a seq-0 event as "new run, wipe the timeline".
   let traceSeq = 0
   const traceEmit = (input: AgentTraceInput): void => {
     // A funnel snapshot is the provider ACKNOWLEDGING the hold: it flips
@@ -105,7 +106,9 @@ export function installSync(db: AppDatabase, modelManager: ModelManager): () => 
         body: prompt,
         chars: prompt.length,
       })
+      const startedAt = Date.now()
       const raw = await inner.complete(prompt, options)
+      const durationMs = Date.now() - startedAt
       const { thinking, answer } = splitThinking(raw)
       if (thinking !== '') {
         traceEmit({
@@ -115,11 +118,14 @@ export function installSync(db: AppDatabase, modelManager: ModelManager): () => 
           chars: thinking.length,
         })
       }
+      // The whole generation (thinking included) settles on the Response row —
+      // its Prompt row above marks the start.
       traceEmit({
         channel: 'llm',
         label: `Response · ${answer.length} chars`,
         body: answer,
         chars: answer.length,
+        durationMs,
       })
       return answer
     },
@@ -131,14 +137,20 @@ export function installSync(db: AppDatabase, modelManager: ModelManager): () => 
     // A fresh pass never starts paused; clear any stale waiters.
     paused = false
     releaseResume()
+    // Fresh pass, fresh timeline: this pass's first event carries seq 0.
+    traceSeq = 0
     setAgentState('running')
     // Scanned-mail memory for this pass, so the mailbox agent only LLMs new
     // mail; persisted (capped, most-recent-wins) after the pass settles.
     const seenMailIds = new Set(store.get('processedMailIds'))
+    // Set when 'Sync started' is emitted — the pass's start marker, so the
+    // finish row can report how long the whole pass took.
+    let passStartedAt = Date.now()
     const promise = (async (): Promise<SyncSummary> => {
       // The manager gives us the loaded LLM only when AI is on AND the model is
       // downloaded; null otherwise (off → RAM stays free, model skipped).
       const rawLlm = await modelManager.resolveLlm(createLlamaClient)
+      passStartedAt = Date.now()
       traceEmit({
         channel: 'sync',
         label: force ? 'Sync started (manual)' : 'Sync started',
@@ -185,6 +197,7 @@ export function installSync(db: AppDatabase, modelManager: ModelManager): () => 
         traceEmit({
           channel: 'sync',
           label: `Sync finished · +${summary.inserted} new, ${summary.updated} updated`,
+          durationMs: Date.now() - passStartedAt,
         })
       })
       .catch((error: unknown) => {

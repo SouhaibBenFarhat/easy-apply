@@ -18,7 +18,7 @@ import { DEFAULT_SEARCH_PROFILE } from '@sources/shared'
 import type { PoliteHttpClient } from './http'
 // Imported through the barrel so the @sources/main entry point is exercised.
 import { runSync, type SyncDeps, type SyncEvent, type SyncSummary, summarizeNewJobs } from './index'
-import type { FetchContext, JobSourceProvider, RawPayload } from './types'
+import type { AgentTraceInput, FetchContext, JobSourceProvider, RawPayload } from './types'
 
 const migrationsFolder = fileURLToPath(new URL('../../../drizzle', import.meta.url))
 
@@ -272,6 +272,22 @@ describe('runSync — failure isolation', () => {
       updated: 0,
     })
     expect(baRun?.finishedAt).not.toBeNull()
+  })
+
+  // A crashed provider must be visible in the panel being watched: without
+  // this row the timeline shows a run that quietly "finished" while the error
+  // only reached sync_runs and the Sources page.
+  it('emits a failure trace row so the crash shows up in the agent timeline', async () => {
+    const ba = makeProvider({ id: 'ba', failWith: 'connection reset mid-scan' })
+    const traces: AgentTraceInput[] = []
+
+    await runSync(makeDeps([ba], { trace: (event) => traces.push(event) }))
+
+    expect(traces).toContainEqual({
+      channel: 'sync',
+      label: 'ba failed — sync aborted for this source',
+      body: 'connection reset mid-scan',
+    })
   })
 
   it('persists and counts jobs a provider saved incrementally via ctx.saveJobs', async () => {

@@ -1,6 +1,12 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { describeMailError, type MailDriver, type MailMessage, readRecentMessages } from './mail'
+import {
+  describeMailError,
+  type MailDriver,
+  type MailMessage,
+  readMessages,
+  readRecentEnvelopes,
+} from './mail'
 
 function message(uid: number, from: string): MailMessage {
   return {
@@ -14,18 +20,29 @@ function message(uid: number, from: string): MailMessage {
   }
 }
 
-// A fake driver that records lifecycle calls and returns a canned result (or
-// throws from search), so the read/close logic is exercised with zero network
-// or real mailbox — the PoliteHttpClient fake-injection pattern.
+// A fake driver that records lifecycle calls and returns canned results (or
+// throws), so the read/close logic is exercised with zero network or real
+// mailbox — the PoliteHttpClient fake-injection pattern.
 function fakeDriver(result: MailMessage[] | Error, calls: string[]): MailDriver {
+  const yieldOrThrow = <T>(value: T): T => {
+    if (result instanceof Error) throw result
+    return value
+  }
   return {
     connect: async () => {
       calls.push('connect')
     },
-    search: async () => {
-      calls.push('search')
-      if (result instanceof Error) throw result
-      return result
+    listEnvelopes: async () => {
+      calls.push('listEnvelopes')
+      return yieldOrThrow(
+        result instanceof Error ? [] : result.map(({ html, text, ...rest }) => rest),
+      )
+    },
+    fetchMessages: async (request) => {
+      calls.push(`fetchMessages(${request.uids.join(',')})`)
+      return yieldOrThrow(
+        result instanceof Error ? [] : result.filter((m) => request.uids.includes(m.uid)),
+      )
     },
     close: async () => {
       calls.push('close')
@@ -33,13 +50,10 @@ function fakeDriver(result: MailMessage[] | Error, calls: string[]): MailDriver 
   }
 }
 
-describe('readRecentMessages', () => {
-  const options = {
-    mailbox: 'INBOX',
-    since: new Date('2026-07-01T00:00:00.000Z'),
-  }
+const options = { mailbox: 'INBOX', since: new Date('2026-07-01T00:00:00.000Z') }
 
-  it('returns every message the driver yields, regardless of sender', async () => {
+describe('readRecentEnvelopes', () => {
+  it('returns every envelope the driver yields, regardless of sender', async () => {
     const calls: string[] = []
     const driver = fakeDriver(
       [
@@ -50,24 +64,57 @@ describe('readRecentMessages', () => {
       calls,
     )
 
-    const messages = await readRecentMessages(driver, options)
+    const envelopes = await readRecentEnvelopes(driver, options)
 
     // No sender filtering: the LLM decides what holds jobs.
-    expect(messages.map((m) => m.uid)).toEqual([1, 2, 3])
+    expect(envelopes.map((envelope) => envelope.uid)).toEqual([1, 2, 3])
   })
 
-  it('connects, searches, then closes — in order', async () => {
+  it('connects, lists, then closes — in order', async () => {
     const calls: string[] = []
-    await readRecentMessages(fakeDriver([], calls), options)
-    expect(calls).toEqual(['connect', 'search', 'close'])
+    await readRecentEnvelopes(fakeDriver([], calls), options)
+    expect(calls).toEqual(['connect', 'listEnvelopes', 'close'])
   })
 
-  it('closes the connection even when the search fails', async () => {
+  it('closes the connection even when the listing fails', async () => {
     const calls: string[] = []
     const driver = fakeDriver(new Error('IMAP timeout'), calls)
 
-    await expect(readRecentMessages(driver, options)).rejects.toThrow('IMAP timeout')
-    expect(calls).toEqual(['connect', 'search', 'close'])
+    await expect(readRecentEnvelopes(driver, options)).rejects.toThrow('IMAP timeout')
+    expect(calls).toEqual(['connect', 'listEnvelopes', 'close'])
+  })
+})
+
+describe('readMessages', () => {
+  it('downloads only the requested uids', async () => {
+    const calls: string[] = []
+    const driver = fakeDriver(
+      [message(1, 'a@x.io'), message(2, 'b@x.io'), message(3, 'c@x.io')],
+      calls,
+    )
+
+    const messages = await readMessages(driver, { mailbox: 'INBOX', uids: [1, 3] })
+
+    expect(messages.map((m) => m.uid)).toEqual([1, 3])
+    expect(calls).toEqual(['connect', 'fetchMessages(1,3)', 'close'])
+  })
+
+  // Nothing new to scan must not open a connection at all — the common case
+  // once the window has already been processed.
+  it('skips the connection entirely for an empty uid set', async () => {
+    const calls: string[] = []
+    expect(await readMessages(fakeDriver([], calls), { mailbox: 'INBOX', uids: [] })).toEqual([])
+    expect(calls).toEqual([])
+  })
+
+  it('closes the connection even when the fetch fails', async () => {
+    const calls: string[] = []
+    const driver = fakeDriver(new Error('IMAP timeout'), calls)
+
+    await expect(readMessages(driver, { mailbox: 'INBOX', uids: [1] })).rejects.toThrow(
+      'IMAP timeout',
+    )
+    expect(calls).toEqual(['connect', 'fetchMessages(1)', 'close'])
   })
 })
 

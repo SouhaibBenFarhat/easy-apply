@@ -184,13 +184,21 @@ export async function listFeed(db: AppDatabase, filters: FeedFilters = {}): Prom
     )
   if (filters.includeHidden !== true) conditions.push(eq(jobs.hidden, false))
 
-  const rows = await db.drizzle
+  // NO default limit. The feed used to cap at 200 rows, which meant a database
+  // holding 747 jobs silently returned the same 200 forever — new arrivals
+  // could only displace older rows, never grow the list, and the truncation was
+  // invisible. `limit`/`offset` are honoured when a caller asks for them
+  // (pagination, tests); absent, the feed is the whole matching set. The list is
+  // virtualized, and every row of the full set weighs ~4 KB.
+  const query = db.drizzle
     .select()
     .from(jobs)
     .where(and(...conditions))
     .orderBy(sql`${jobs.postedAt} desc nulls last`, desc(jobs.firstSeenAt))
-    .limit(filters.limit ?? 200)
-    .offset(filters.offset ?? 0)
+    .$dynamic()
+  if (filters.limit !== undefined) query.limit(filters.limit)
+  if (filters.offset !== undefined && filters.offset > 0) query.offset(filters.offset)
+  const rows = await query
   return rows.map(rowToStoredJob)
 }
 

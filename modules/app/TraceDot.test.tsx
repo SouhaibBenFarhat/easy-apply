@@ -1,9 +1,13 @@
 import type { AgentTraceEvent } from '@data'
 import { render, screen } from '@test-utils'
-import { TraceDot, TraceLegend, traceTone } from './TraceDot'
+import { isCompletedStep, TraceDot, TraceLegend, traceTone } from './TraceDot'
 
-function ev(channel: AgentTraceEvent['channel'], label: string): AgentTraceEvent {
-  return { seq: 0, at: '2026-07-21T09:00:00.000Z', channel, label }
+function ev(
+  channel: AgentTraceEvent['channel'],
+  label: string,
+  durationMs?: number,
+): AgentTraceEvent {
+  return { seq: 0, at: '2026-07-21T09:00:00.000Z', channel, label, durationMs }
 }
 
 describe('traceTone', () => {
@@ -31,6 +35,27 @@ describe('traceTone', () => {
   })
 })
 
+// Colour says what a row is; fill says whether its step finished. Only rows
+// that closed a step carry a main-stamped duration.
+describe('isCompletedStep', () => {
+  it('treats a row with a measured duration as finished', () => {
+    expect(isCompletedStep(ev('mailbox', 'Found 313 email(s)', 1_600))).toBe(true)
+    expect(isCompletedStep(ev('llm', 'Response · 96 chars', 842))).toBe(true)
+  })
+
+  it('treats an opening row as unfinished', () => {
+    expect(isCompletedStep(ev('mailbox', 'Connecting to a@b.com…'))).toBe(false)
+    expect(isCompletedStep(ev('pipeline', 'Analyzing "Backend roles"'))).toBe(false)
+    expect(isCompletedStep(ev('llm', 'Prompt · 42 chars'))).toBe(false)
+  })
+
+  // Reasoning is emitted after generation ends; its time rides on the Response
+  // row that follows, so it must not read as still-running.
+  it('counts a reasoning row as finished despite carrying no duration', () => {
+    expect(isCompletedStep(ev('thinking', 'Thinking · 10 chars'))).toBe(true)
+  })
+})
+
 describe('TraceDot', () => {
   it('spins only while that checkpoint is the one being worked on', () => {
     const { rerender } = render(<TraceDot event={ev('llm', 'Prompt')} />)
@@ -39,12 +64,24 @@ describe('TraceDot', () => {
     rerender(<TraceDot event={ev('llm', 'Prompt')} active />)
     expect(screen.getByRole('status', { name: 'Running' })).toBeInTheDocument()
   })
+
+  // The silent-crash tell: a step that opened and never closed stays hollow,
+  // so it can't pass for a completed one.
+  it('draws an unfinished step hollow and a finished one solid', () => {
+    const { container, rerender } = render(<TraceDot event={ev('pipeline', 'Analyzing "x"')} />)
+    const dot = (): Element | null => container.querySelector('span > span')
+    expect(dot()?.className).toContain('bg-transparent')
+
+    rerender(<TraceDot event={ev('pipeline', 'x · 2 job(s)', 12_400)} />)
+    expect(dot()?.className).toContain('bg-success')
+    expect(dot()?.className).not.toContain('bg-transparent')
+  })
 })
 
 describe('TraceLegend', () => {
-  it('names every dot colour', () => {
+  it('names every dot colour and explains the hollow dot', () => {
     render(<TraceLegend />)
-    for (const label of ['jobs found', 'no jobs', 'step', 'model', 'failed']) {
+    for (const label of ['in progress', 'jobs found', 'no jobs', 'step', 'model', 'failed']) {
       expect(screen.getByText(label)).toBeInTheDocument()
     }
   })

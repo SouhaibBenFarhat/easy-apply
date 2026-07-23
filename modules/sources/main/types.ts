@@ -27,9 +27,24 @@ export interface RawPayload {
   body: string
 }
 
+// Which stage of the run the agent is in. The funnel needs this because only
+// `scanning` has a known total: reading the inbox, triaging and downloading
+// finish when they finish, and a bar frozen at 0/200 through all three reads as
+// a hung app. Mirrored in src/preload/electron-api.d.ts.
+export type AgentPhase = 'reading' | 'triaging' | 'downloading' | 'scanning' | 'done'
+
 // Running counts for the email→job funnel, carried on 'pipeline' events so the
 // monitor renders live progress. Mirrored in src/preload/electron-api.d.ts.
 export interface AgentPipelineStats {
+  phase: AgentPhase
+  // Progress WITHIN the current phase, in that phase's own unit: inboxes read,
+  // triage chunks judged, inboxes downloaded. `scanning` ignores these and uses
+  // emailsProcessed/emailsTotal instead — it is the row-based phase.
+  // phaseTotal 0 means the total is genuinely unknowable yet (only true for the
+  // first moment of a phase), which is the sole case that may show an
+  // indeterminate bar.
+  phaseDone: number
+  phaseTotal: number
   emailsTotal: number // emails handed to the agent this run
   emailsProcessed: number // emails the agent has finished (progress)
   emailsAccepted: number // emails that yielded ≥1 kept job
@@ -64,6 +79,9 @@ export interface AgentTraceInput {
   chars?: number // context load (prompt/response size)
   stats?: AgentPipelineStats // funnel counts, on 'pipeline' events
   jobs?: AgentTraceJob[] // what an email yielded, on its verdict event
+  // Wall-clock ms from the step's start to this completion checkpoint,
+  // measured where the work runs (main) — the renderer never derives timing.
+  durationMs?: number
 }
 
 export type TraceFn = (event: AgentTraceInput) => void

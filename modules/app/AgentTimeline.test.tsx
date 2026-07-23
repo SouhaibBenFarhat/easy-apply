@@ -1,6 +1,6 @@
 import type { AgentTraceEvent } from '@data'
 import { keys } from '@data'
-import { createTestQueryClient, render, screen, userEvent, waitFor } from '@test-utils'
+import { act, createTestQueryClient, render, screen, userEvent, waitFor } from '@test-utils'
 import { AgentTimeline } from './AgentTimeline'
 
 function ev(
@@ -79,6 +79,51 @@ describe('AgentTimeline', () => {
     expect(screen.getByText('Prompt · 42 chars')).toBeInTheDocument()
   })
 
+  // Each step's execution time — stamped in main on the completion row — is
+  // pinned to the right of both plain and expandable rows.
+  it('shows the execution time on rows that carry one', () => {
+    const client = createTestQueryClient()
+    client.setQueryData<AgentTraceEvent[]>(keys.agent.trace, [
+      ev(0, 'sync', 'Sync started'),
+      { ...ev(1, 'pipeline', 'Backend roles for you · no jobs'), jobs: [], durationMs: 12_400 },
+      { ...ev(2, 'llm', 'Response · 96 chars', '[]'), durationMs: 842 },
+    ])
+    render(<AgentTimeline onClose={vi.fn()} onStart={vi.fn()} />, { client })
+
+    expect(screen.getByText('12s')).toBeInTheDocument() // verdict row
+    expect(screen.getByText('842ms')).toBeInTheDocument() // expandable LLM row
+    // A start marker has no duration to show.
+    expect(screen.queryByText(/^0ms$/)).not.toBeInTheDocument()
+  })
+
+  // The in-flight step gets a live stopwatch: elapsed since its main-stamped
+  // start, ticking each second, gone once the completion row lands (which
+  // carries the final figure instead). A stopwatch face ("0:05"), not a
+  // duration ("5.0s"), so a running count never reads as a measurement.
+  it('ticks a live counter on the in-flight step', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-21T09:00:20.000Z'))
+    try {
+      const client = createTestQueryClient()
+      client.setQueryData(keys.agent.state, 'running')
+      client.setQueryData<AgentTraceEvent[]>(keys.agent.trace, [
+        { ...ev(0, 'llm', 'Response · 96 chars', '[]'), durationMs: 842 },
+        ev(1, 'pipeline', 'Analyzing "Backend roles for you"'), // at 09:00:15
+      ])
+      render(<AgentTimeline onClose={vi.fn()} onStart={vi.fn()} />, { client })
+
+      expect(screen.getByText('0:05')).toBeInTheDocument()
+      act(() => {
+        vi.advanceTimersByTime(3_000)
+      })
+      expect(screen.getByText('0:08')).toBeInTheDocument()
+      // The finished row keeps its stamped duration — no counter there.
+      expect(screen.getByText('842ms')).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('renders the pipeline funnel from the latest stats event', () => {
     const client = createTestQueryClient()
     client.setQueryData<AgentTraceEvent[]>(keys.agent.trace, [
@@ -89,6 +134,9 @@ describe('AgentTimeline', () => {
         channel: 'pipeline',
         label: 'Email 8/12 · 2 job(s)',
         stats: {
+          phase: 'scanning',
+          phaseDone: 0,
+          phaseTotal: 0,
           emailsTotal: 12,
           emailsProcessed: 8,
           emailsAccepted: 5,
@@ -120,6 +168,9 @@ describe('AgentTimeline', () => {
         channel: 'pipeline',
         label: 'Analyzing "Your application was viewed by Oliver Bernard"',
         stats: {
+          phase: 'scanning',
+          phaseDone: 0,
+          phaseTotal: 0,
           emailsTotal: 5,
           emailsProcessed: 2,
           emailsAccepted: 1,

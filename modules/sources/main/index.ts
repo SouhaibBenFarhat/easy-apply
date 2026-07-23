@@ -18,10 +18,13 @@ export {
 export {
   type MailAccount,
   type MailDriver,
+  type MailEnvelope,
+  type MailFetchRequest,
   type MailMessage,
   type MailSearchQuery,
   type ReadRecentOptions,
-  readRecentMessages,
+  readMessages,
+  readRecentEnvelopes,
 } from './mail'
 export {
   buildExtractionPrompt,

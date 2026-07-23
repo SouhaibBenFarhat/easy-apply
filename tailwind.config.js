@@ -110,6 +110,13 @@ export default {
           from: { transform: 'rotate(0deg)' },
           to: { transform: 'rotate(360deg)' },
         },
+        // Indeterminate progress: a band sweeping the groove, for the phases
+        // whose total is unknowable until they finish (reading the inbox,
+        // triaging). A bar frozen at 0% through those minutes reads as hung.
+        'progress-sweep': {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(300%)' },
+        },
       },
       animation: {
         skeleton: 'skeleton 2.5s ease-in-out infinite',
@@ -119,6 +126,7 @@ export default {
         'scale-in': 'scale-in var(--duration) var(--ease)',
         'slide-in-from-bottom': 'slide-in-from-bottom var(--duration) var(--ease)',
         'spin-slow': 'spin 1.2s linear infinite',
+        'progress-sweep': 'progress-sweep 1.6s var(--ease) infinite',
       },
     },
   },

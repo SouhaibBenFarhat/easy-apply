@@ -1,3 +1,4 @@
+export { describeError } from './errors'
 export { fail, type IpcResult, ok } from './ipc'
 export {
   type FeedFilters,
