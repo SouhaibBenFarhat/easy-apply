@@ -2,6 +2,7 @@ import type { NormalizedJob, SourceId, WorkMode } from '@sources/shared'
 import { z } from 'zod'
 import { classifyWorkMode } from './classify'
 import type { MailMessage } from './mail'
+import { expandLinkTag, sanitizeEmailForPrompt } from './mail-sanitize'
 import { buildDedupeKey, cleanText, stripHtmlKeepingLinks, toIsoOrNull } from './normalize'
 
 // The agentic core: turn an arbitrary email into normalized jobs via an
@@ -17,6 +18,9 @@ export interface LlmCompleteOptions {
   // Abort the generation mid-stream (the Stop button / AI-off), so a slow call
   // halts immediately instead of only between emails.
   signal?: AbortSignal
+  // Hard ceiling on generated tokens. Generation is serial — one pass over the
+  // whole model per token — so an uncapped answer is an uncapped stall.
+  maxTokens?: number
 }
 
 export interface LlmClient {
@@ -37,6 +41,10 @@ const URL_SOURCES: ReadonlyArray<{ pattern: string; sourceId: SourceId }> = [
   { pattern: 'indeed.', sourceId: 'indeed' },
   { pattern: 'stepstone.', sourceId: 'stepstone' },
   { pattern: 'xing.', sourceId: 'xing' },
+  { pattern: 'glassdoor.', sourceId: 'glassdoor' },
+  // Matches the tracking host too (trk.instaffo.com), which is what the apply
+  // links in their digests actually point at.
+  { pattern: 'instaffo.', sourceId: 'instaffo' },
 ]
 
 function sourceFromUrl(url: string): SourceId {
@@ -45,13 +53,19 @@ function sourceFromUrl(url: string): SourceId {
   return 'mailbox'
 }
 
-// Once the CSS/script noise is stripped, a job digest's real text is small, so
-// this comfortably holds a large "see all jobs" digest. Sized against the 8192
-// context window (src/main/llm.ts): ~10k chars is ~3.5–4.5k tokens once
-// tracking URLs are counted, leaving real room for instructions + up to 25
+// Once the CSS/script noise is stripped AND tracking URLs are swapped for
+// [LINK-n] tags (mail-sanitize.ts), a digest's text is almost all content, so
+// this comfortably holds a large "see all jobs" digest well inside the 8192
+// context window (src/main/llm.ts) with real room for instructions + up to 25
 // jobs of JSON output; raise the model context too if you raise this further.
 const MAX_EMAIL_CHARS = 10_000
 const MAX_JOBS_PER_EMAIL = 25
+
+// Enough for MAX_JOBS_PER_EMAIL rows of JSON — each job is a short record whose
+// applyUrl is a [LINK-n] tag rather than a 1,500-char tracking URL. Past this
+// the model is repeating itself, and every extra token is another full pass
+// over the weights.
+const MAX_EXTRACTION_TOKENS = 1_200
 
 // zod stays module-internal (house rule); everything optional so one odd row
 // never sinks the batch.
@@ -63,14 +77,15 @@ const extractedJobSchema = z.looseObject({
   applyUrl: z.string().optional(),
 })
 
-// The email is stripped to text and truncated so a long digest stays inside the
-// model's context window.
+// The email is stripped to text, sanitized (URLs → [LINK-n] tags), and
+// truncated so a long digest stays inside the model's context window.
 export function buildExtractionPrompt(emailText: string): string {
   return [
     'Extract every job posting from this email as a JSON array.',
     'Each item: {"title","company","location","workMode","applyUrl"}.',
     'workMode is one of: remote, hybrid, onsite, unknown.',
-    'applyUrl is the posting link. Return ONLY the JSON array, nothing else.',
+    'Links appear as tags like [LINK-3]; applyUrl is the posting link tag, copied exactly.',
+    'Return ONLY the JSON array, nothing else.',
     'If the email contains no job postings, return an empty array: [].',
     '',
     emailText.slice(0, MAX_EMAIL_CHARS),
@@ -112,13 +127,19 @@ export async function extractJobsFromEmail(
   signal?: AbortSignal,
 ): Promise<ExtractionResult> {
   // Keep link URLs — the apply link lives in the <a href>, so the model needs
-  // it to produce a valid applyUrl (else every job is dropped by the harness).
+  // it (as a tag) to produce a valid applyUrl (else the harness drops the job).
   const text = stripHtmlKeepingLinks(message.html ?? message.text ?? '')
   if (text.trim() === '') return { jobs: [], proposed: 0 }
+  // Sanitize BEFORE truncation: with URLs already collapsed to tags, the
+  // MAX_EMAIL_CHARS window holds listings, not tracking-URL noise.
+  const { text: sanitized, links } = sanitizeEmailForPrompt(text)
 
   let completion: string
   try {
-    completion = await llm.complete(buildExtractionPrompt(text), { signal })
+    completion = await llm.complete(buildExtractionPrompt(sanitized), {
+      signal,
+      maxTokens: MAX_EXTRACTION_TOKENS,
+    })
   } catch {
     return { jobs: [], proposed: 0 } // one email failing the model never sinks the sync
   }
@@ -134,9 +155,12 @@ export async function extractJobsFromEmail(
     const entry = parsed.data
     const title = cleanText(entry.title ?? '')
     const company = cleanText(entry.company ?? '')
-    const applyUrl = (entry.applyUrl ?? '').trim()
-    // Anchor on a real link: no title/company/http(s) URL → drop it.
-    if (title === '' || company === '' || !/^https?:\/\//i.test(applyUrl)) continue
+    const cited = (entry.applyUrl ?? '').trim()
+    // Anchor on a real link: the model cites a [LINK-n] tag, which must exist
+    // in the email's link table. A raw http(s) URL is still accepted for
+    // models that ignore the tag instruction; anything else drops the row.
+    const applyUrl = expandLinkTag(cited, links) ?? (/^https?:\/\//i.test(cited) ? cited : '')
+    if (title === '' || company === '' || applyUrl === '') continue
     // The board is inferred from the apply link, not the sender.
     const sourceId = sourceFromUrl(applyUrl)
     const id = `${sourceId}:${slugifyUrl(applyUrl)}`

@@ -9,10 +9,20 @@ import { serializeAccounts } from '../mailbox-accounts'
 import type { AgentTraceInput, FetchContext } from '../types'
 import { mailboxProvider } from './mailbox'
 
-function fakeDriver(messages: MailMessage[]): MailDriver {
+// Records which uids actually had their bodies downloaded, so the tests can
+// assert the two-phase read never pulls a body it doesn't need.
+interface DriverLog {
+  fetchedUids: number[]
+}
+
+function fakeDriver(messages: MailMessage[], log?: DriverLog): MailDriver {
   return {
     connect: async () => {},
-    search: async () => messages,
+    listEnvelopes: async () => messages.map(({ html, text, ...envelope }) => envelope),
+    fetchMessages: async (request) => {
+      log?.fetchedUids.push(...request.uids)
+      return messages.filter((message) => request.uids.includes(message.uid))
+    },
     close: async () => {},
   }
 }
@@ -20,9 +30,23 @@ function fakeDriver(messages: MailMessage[]): MailDriver {
 // A fake LLM that emits a job whose apply URL determines the board, or an empty
 // array for anything else — so we can watch the read-everything funnel accept,
 // reject, and route emails by the extracted URL.
+// Triage asks the model to pick numbers from a list; keeping everything makes
+// these tests about the SCANNING loop, which is what they exercise. Triage's
+// own filtering is covered in mail-triage.test.ts, and by the dedicated test
+// below.
+function keepAllTriageAnswer(prompt: string): string {
+  const rows = prompt.split('\n').filter((line) => /^\d+ \| /.test(line)).length
+  return JSON.stringify(Array.from({ length: rows }, (_, i) => i + 1))
+}
+
+function isTriagePrompt(prompt: string): boolean {
+  return prompt.includes('numbered list of emails')
+}
+
 function fakeLlm(): LlmClient {
   return {
     complete: async (prompt) => {
+      if (isTriagePrompt(prompt)) return keepAllTriageAnswer(prompt)
       if (prompt.includes('LINKEDIN'))
         return JSON.stringify([
           { title: 'LI role', company: 'Acme', applyUrl: 'https://linkedin.com/jobs/1' },
@@ -41,6 +65,7 @@ function makeCtx(
   messages: MailMessage[] = [],
   withRuntime = true,
   trace?: (event: AgentTraceInput) => void,
+  log?: DriverLog,
 ): FetchContext {
   const noop = (): void => {}
   const logger: Logger = { debug: noop, info: noop, warn: noop, error: noop }
@@ -51,7 +76,7 @@ function makeCtx(
     logger,
   }
   if (withRuntime) {
-    ctx.createMail = () => fakeDriver(messages)
+    ctx.createMail = () => fakeDriver(messages, log)
     ctx.llm = fakeLlm()
   }
   if (trace !== undefined) ctx.trace = trace
@@ -128,12 +153,48 @@ describe('mailboxProvider.fetch', () => {
     )
   })
 
+  it('stamps execution time on step-completion rows, never on start markers', async () => {
+    const traces: AgentTraceInput[] = []
+    const ctx = makeCtx(
+      accounts,
+      [msg(1, 'a@linkedin.com', 'LINKEDIN alert'), msg(2, 'c@random.io', 'just a newsletter')],
+      true,
+      (event) => traces.push(event),
+    )
+    await mailboxProvider.fetch(ctx)
+
+    const byLabel = (re: RegExp): AgentTraceInput[] =>
+      traces.filter((event) => re.test(event.label))
+    // Completion rows carry the measured duration: the inbox read, every
+    // per-email verdict, and the terminal Done summary.
+    for (const event of [
+      ...byLabel(/^Found \d+ email/),
+      ...traces.filter((entry) => entry.jobs !== undefined),
+      ...byLabel(/^Done —/),
+    ]) {
+      expect(event.durationMs).toBeGreaterThanOrEqual(0)
+    }
+    expect(traces.filter((entry) => entry.jobs !== undefined)).toHaveLength(2)
+    // Start markers are the other end of the measurement — no duration.
+    for (const event of [
+      ...byLabel(/^Connecting/),
+      ...byLabel(/^Analyzing/),
+      ...byLabel(/^Scanning/),
+    ]) {
+      expect(event.durationMs).toBeUndefined()
+    }
+  })
+
   it('skips emails already processed in a past sync and remembers new ones', async () => {
     const processed = new Set(['<msg-1@mail>'])
-    const ctx = makeCtx(accounts, [
-      msg(1, 'a@linkedin.com', 'LINKEDIN alert'),
-      msg(2, 'b@stepstone.de', 'STEPSTONE alert'),
-    ])
+    const log: DriverLog = { fetchedUids: [] }
+    const ctx = makeCtx(
+      accounts,
+      [msg(1, 'a@linkedin.com', 'LINKEDIN alert'), msg(2, 'b@stepstone.de', 'STEPSTONE alert')],
+      true,
+      undefined,
+      log,
+    )
     ctx.processedMessages = { has: (id) => processed.has(id), add: (id) => processed.add(id) }
 
     const payloads = await mailboxProvider.fetch(ctx)
@@ -143,6 +204,28 @@ describe('mailboxProvider.fetch', () => {
     expect(jobs.map((job) => job.sourceId)).toEqual(['stepstone'])
     // The newly-scanned message is remembered for next time.
     expect(processed.has('<msg-2@mail>')).toBe(true)
+    // …and crucially its BODY was never downloaded: the whole point of the
+    // two-phase read is that an already-scanned window costs headers only.
+    expect(log.fetchedUids).toEqual([2])
+  })
+
+  // Once the window has been fully scanned, a sync must cost headers alone —
+  // no bodies, no connection for the (empty) fetch phase.
+  it('downloads no bodies at all when every email was already processed', async () => {
+    const processed = new Set(['<msg-1@mail>', '<msg-2@mail>'])
+    const log: DriverLog = { fetchedUids: [] }
+    const ctx = makeCtx(
+      accounts,
+      [msg(1, 'a@linkedin.com', 'LINKEDIN alert'), msg(2, 'b@stepstone.de', 'STEPSTONE alert')],
+      true,
+      undefined,
+      log,
+    )
+    ctx.processedMessages = { has: (id) => processed.has(id), add: (id) => processed.add(id) }
+
+    await mailboxProvider.fetch(ctx)
+
+    expect(log.fetchedUids).toEqual([])
   })
 
   it('saves each email incrementally via saveJobs, marking it processed after', async () => {
@@ -163,6 +246,98 @@ describe('mailboxProvider.fetch', () => {
     expect(saved).toEqual(['linkedin'])
     // …and the email is marked processed only after its jobs are durable.
     expect(processed.has('<msg-1@mail>')).toBe(true)
+  })
+
+  // Triage is the whole point of the rework: an email that isn't job mail must
+  // never reach the (slow) extraction call, and its body must never be
+  // downloaded either.
+  it('skips non-job mail before downloading or extracting it', async () => {
+    const log: DriverLog = { fetchedUids: [] }
+    const extractionPrompts: string[] = []
+    const processed = new Set<string>()
+    const ctx = makeCtx(
+      accounts,
+      [
+        msg(1, 'a@linkedin.com', 'LINKEDIN alert'),
+        msg(2, 'newsletter@medium.com', 'nothing to see'),
+      ],
+      true,
+      undefined,
+      log,
+    )
+    ctx.processedMessages = { has: (id) => processed.has(id), add: (id) => processed.add(id) }
+    // Triage rejects everything it is asked about; the LinkedIn mail never gets
+    // asked (its sender decides it deterministically).
+    ctx.llm = {
+      complete: async (prompt) => {
+        if (isTriagePrompt(prompt)) return '[]'
+        extractionPrompts.push(prompt)
+        return JSON.stringify([
+          { title: 'LI role', company: 'Acme', applyUrl: 'https://linkedin.com/jobs/1' },
+        ])
+      },
+    }
+
+    await mailboxProvider.fetch(ctx)
+
+    // Only the LinkedIn email was downloaded and extracted.
+    expect(log.fetchedUids).toEqual([1])
+    expect(extractionPrompts).toHaveLength(1)
+    // The triaged-out email is remembered, so it isn't re-judged every sync.
+    expect(processed.has('<msg-2@mail>')).toBe(true)
+  })
+
+  // The bug behind "it finishes without going through all emails": one failing
+  // save aborted the entire provider, so a 200-email run ended having
+  // processed none of them. One email must never sink the scan.
+  it('keeps scanning when one email fails, and retries it next sync', async () => {
+    const traces: AgentTraceInput[] = []
+    const processed = new Set<string>()
+    const ctx = makeCtx(
+      accounts,
+      [
+        msg(1, 'a@linkedin.com', 'LINKEDIN alert'),
+        msg(2, 'b@stepstone.de', 'STEPSTONE alert'),
+        msg(3, 'c@random.io', 'just a newsletter'),
+      ],
+      true,
+      (event) => traces.push(event),
+    )
+    ctx.processedMessages = { has: (id) => processed.has(id), add: (id) => processed.add(id) }
+    // The first email's save blows up the way the real one did — a wrapped DB
+    // error whose real reason hides in `cause`.
+    let saves = 0
+    ctx.saveJobs = async (batch) => {
+      saves += 1
+      if (saves === 1)
+        throw new Error('Failed query: insert into "jobs" …', {
+          cause: new Error('ON CONFLICT DO UPDATE command cannot affect row a second time'),
+        })
+      return { inserted: batch.length, updated: 0 }
+    }
+
+    await mailboxProvider.fetch(ctx)
+
+    // The scan ran to completion instead of dying on email 1, and the failed
+    // email is counted exactly once — with none of its unsaved jobs claimed.
+    const last = [...traces].reverse().find((event) => event.stats !== undefined)?.stats
+    expect(last).toMatchObject({
+      emailsTotal: 3,
+      emailsProcessed: 3,
+      emailsAccepted: 1, // only the stepstone email saved successfully
+      emailsRejected: 2, // the newsletter + the failed one
+      jobsKept: 1,
+      done: true,
+    })
+    expect(traces.some((event) => /^Done —/.test(event.label))).toBe(true)
+    // The failure is visible, with the root cause, not swallowed.
+    const failure = traces.find((event) => /^Email failed/.test(event.label))
+    expect(failure?.body).toContain('cannot affect row a second time')
+    // The failed email is not marked processed → it is retried next sync,
+    // while the ones that succeeded are remembered.
+    expect(processed.has('<msg-1@mail>')).toBe(false)
+    expect(processed.has('<msg-2@mail>')).toBe(true)
+    expect(processed.has('<msg-3@mail>')).toBe(true)
   })
 
   it('stops the scan when the signal is aborted', async () => {

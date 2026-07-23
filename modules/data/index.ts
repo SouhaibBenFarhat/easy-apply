@@ -17,6 +17,7 @@ export type {
   WorkMode,
 } from '@sources/shared'
 export type {
+  AgentPhase,
   AgentPipelineStats,
   AgentState,
   AgentTraceEvent,

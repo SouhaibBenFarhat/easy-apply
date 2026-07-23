@@ -97,20 +97,23 @@ extraction instead of an HTTP GET. This is the "agent."
 
 ```mermaid
 flowchart TD
-  Start["mailbox.fetch(ctx)"] --> IMAP["Read <b>All Mail</b> over IMAP<br/>last 30 days · <code>mail-driver.ts</code>"]
+  Start["mailbox.fetch(ctx)"] --> IMAP["<b>Phase 1 · listEnvelopes</b><br/>All Mail · last 30 days · HEADERS ONLY<br/><code>mail-driver.ts</code>"]
   IMAP --> Skip["Drop already-scanned emails<br/>(message-id memory)"]
-  Skip --> Sort["Sort newest-first · cap 200/run"]
-  Sort --> Loop{{"for each NEW email"}}
+  Skip --> Triage["<b>Triage</b> · <code>mail-triage.ts</code><br/>1. sender/subject rules (free)<br/>2. batched LLM call on the rest"]
+  Triage --> Sort["Sort newest-first · cap 200/run"]
+  Sort --> Bodies["<b>Phase 2 · fetchMessages</b><br/>full source for the survivors only"]
+  Bodies --> Loop{{"for each NEW email"}}
 
   Loop -->|"signal aborted"| Stopped["Stop → keep partial, exit"]
   Loop -->|"paused"| Hold["Hold at gate<br/>until Resume"]
   Hold --> Loop
 
-  Loop --> Strip["<b>stripHtmlKeepingLinks</b><br/>drop CSS/JS · keep &lt;a href&gt; URLs<br/>truncate to 10k chars"]
-  Strip --> LLM["<b>On-device LLM</b> (node-llama-cpp)<br/>1 prompt → JSON array"]
+  Loop --> Strip["<b>stripHtmlKeepingLinks</b><br/>drop CSS/JS · keep &lt;a href&gt; URLs"]
+  Strip --> Sanitize["<b>sanitizeEmailForPrompt</b><br/>strip invisible padding ·<br/>URLs → [LINK-n] tags · truncate 10k"]
+  Sanitize --> LLM["<b>On-device LLM</b> (node-llama-cpp)<br/>1 prompt → JSON array"]
   LLM -.->|"&lt;think&gt; segment"| Trace["thinking → trace"]
   LLM --> Harness["<b>Harness</b> (deterministic)<br/>parse JSON · zod · require<br/>title + company + http(s) applyUrl · dedupe"]
-  Harness --> Route["<b>source-from-URL</b><br/>linkedin / indeed / stepstone /<br/>xing / mailbox"]
+  Harness --> Route["<b>source-from-URL</b><br/>linkedin / indeed / stepstone / xing /<br/>glassdoor / instaffo / mailbox"]
   Route --> Save["<b>saveJobs</b> (incremental)<br/>→ upsert → PGlite"]
   Save --> Mark["mark message-id processed"]
   Mark --> Loop
@@ -119,37 +122,72 @@ flowchart TD
 
 ### Stage by stage
 
-1. **Read All Mail** (`src/main/mail-driver.ts`). We resolve Gmail's `\All`
-   special-use folder (locale-safe) rather than only `INBOX`, so alerts filtered
-   into a label aren't missed. `imapflow` + `mailparser`; a stray socket error is
-   caught (an unhandled one would crash main).
+1. **Read All Mail, in two phases** (`src/main/mail-driver.ts`). We resolve
+   Gmail's `\All` special-use folder (locale-safe) rather than only `INBOX`, so
+   alerts filtered into a label aren't missed. `imapflow` + `mailparser`; a
+   stray socket error is caught (an unhandled one would crash main).
+   - **Phase 1 — `listEnvelopes`**: headers only for the 30-day window. No
+     bodies, no attachments, no inline images.
+   - **Phase 2 — `fetchMessages`**: full source for an explicit UID set, after
+     the caller has decided what is worth downloading. An empty set opens no
+     connection at all.
+   > Downloading everything and discarding the already-scanned afterwards cost
+   > ~100 s and tens of MB *per sync* on a 313-message window — even when
+   > nothing was new. Filtering on headers makes a fully-scanned window cost
+   > headers alone.
 2. **Skip already-scanned** — each message's `Message-ID` is remembered
-   (persisted, capped at 5,000). A sync only runs the LLM on *new* mail. Newest
-   first, capped at 200 per run (surfaced as `capped`, never a silent drop).
-3. **HTML → text, keeping links** (`stripHtmlKeepingLinks` in
+   (persisted, capped at 5,000). The filter runs on the **envelopes**, between
+   the two phases, so only genuinely new mail is ever downloaded. Newest first,
+   capped at 200 per run (surfaced as `capped`, never a silent drop).
+3. **Triage** (`modules/sources/main/mail-triage.ts`). Extraction costs a full
+   LLM generation per email, and that cost is flat whether the email holds 25
+   jobs or none — the model still reasons its way to "no jobs". Triage decides
+   from headers alone which emails deserve it:
+   - **Deterministic first**: a known job-board sender (`linkedin.`,
+     `instaffo.`, `glassdoor.`, …) or a job word in the subject. Free, instant.
+   - **Then the model**, one batched call per chunk of 40, over only what stage
+     one could not decide. It answers with row numbers, not text.
+   > **Sender may include, never exclude.** An unrecognized sender is not
+   > dropped — it goes to the model. And every failure path (unreadable answer,
+   > failed call, aborted run, no model at all) **keeps** the mail. A filter that
+   > can lose a job must fail open.
+   >
+   > Emails triaged out *are* marked processed, so the same newsletters aren't
+   > re-judged every sync — the trade being that a mis-skipped email is not
+   > reconsidered, which is why triage errs toward keeping.
+4. **HTML → text, keeping links** (`stripHtmlKeepingLinks` in
    `modules/sources/main/normalize.ts`). Two things matter here:
    - **Drop `<style>`/`<script>` content** — marketing emails ship huge inline
      CSS that would otherwise fill the truncation window with gibberish.
    - **Keep `<a href>` targets as `text (url)`** — the apply link lives in the
      href, not the visible "View" text. Without this the model has no URL to
      extract and the harness drops every job.
-4. **The LLM call** (`modules/sources/main/mail-extract.ts` →
+5. **Prompt sanitization** (`modules/sources/main/mail-sanitize.ts`). Marketing
+   mail pads its preview with hundreds of invisible characters and wraps every
+   link in a ~1,500-char tracking URL — noise that tokenizes at ~1 token per
+   2–3 chars and once had the model hand-copying a tracking URL for minutes.
+   Invisible padding is stripped, and each URL becomes a short `[LINK-n]` tag
+   the model cites instead of reproducing; the harness expands the tag back to
+   the real URL after extraction. Sanitization runs *before* the 10k-char
+   truncation, so the window holds listings, not URL noise.
+6. **The LLM call** (`modules/sources/main/mail-extract.ts` →
    `src/main/llm.ts`). One single-shot prompt asks for a JSON array of
    `{title, company, location, workMode, applyUrl}`. No tools, no agent loop,
    no RAG — a structured-extraction prompt. Runs fully on-device.
-5. **The reliability harness** — the trust comes from here, not the model:
+7. **The reliability harness** — the trust comes from here, not the model:
    - lenient JSON extraction (grabs the first `[…]`, tolerates prose/fences);
    - `zod` validation, everything optional so one bad row can't sink the batch;
    - **anchor on a real link**: a job is kept only with a non-empty title,
-     company, and a real `http(s)://` `applyUrl` — a hallucinated posting with no
-     genuine link never reaches the feed;
+     company, and an `applyUrl` citing a `[LINK-n]` tag that exists in the
+     email (a raw `http(s)://` URL is still accepted) — a hallucinated posting
+     with no genuine link never reaches the feed;
    - dedupe by slugified apply URL.
    > **The model proposes; the code disposes.** The funnel's "Jobs found" vs
    > "Kept" is exactly this gap.
-6. **Source attribution** — the board is inferred from the **apply URL** host
+8. **Source attribution** — the board is inferred from the **apply URL** host
    (`sourceFromUrl`), so any sender works; unknown hosts become the generic
    `mailbox` source.
-7. **Incremental save** — each email's kept jobs are upserted via `ctx.saveJobs`
+9. **Incremental save** — each email's kept jobs are upserted via `ctx.saveJobs`
    *before* the email is marked processed, so a crash never loses work and never
    skips an email whose jobs weren't saved.
 

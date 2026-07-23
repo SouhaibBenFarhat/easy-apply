@@ -117,7 +117,16 @@ export interface ModelProgressEvent {
 
 // Running counts for the email→job funnel, carried on 'pipeline' trace events
 // so the monitor can render live progress. Mirrors modules/sources/main/types.ts.
+// Mirrors modules/sources/main/types.ts — the run's current stage. Only
+// `scanning` has a known total; the rest drive an indeterminate progress bar.
+export type AgentPhase = 'reading' | 'triaging' | 'downloading' | 'scanning' | 'done'
+
 export interface AgentPipelineStats {
+  phase: AgentPhase
+  // Progress within the current phase, in that phase's own unit (inboxes,
+  // triage chunks). `scanning` uses emailsProcessed/emailsTotal instead.
+  phaseDone: number
+  phaseTotal: number
   emailsTotal: number // emails handed to the agent this run
   emailsProcessed: number // emails the agent has finished (progress)
   emailsAccepted: number // emails that yielded ≥1 kept job
@@ -157,6 +166,9 @@ export interface AgentTraceEvent {
   chars?: number
   stats?: AgentPipelineStats
   jobs?: AgentTraceJob[]
+  // Wall-clock ms from the step's start to this completion checkpoint,
+  // measured in main. Present only on events that finish a step.
+  durationMs?: number
 }
 
 // Mirrors modules/persistence/main/repositories/sync-runs.ts.

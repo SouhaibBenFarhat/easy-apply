@@ -6,16 +6,21 @@
 // the MailDriver interface, so no network or real mailbox is needed to
 // exercise the read/close logic.
 
-// One decoded message pulled from the inbox. `html`/`text` are the decoded
-// body parts; parsers prefer `html` and fall back to `text`.
-export interface MailMessage {
+// Message headers only — cheap to fetch (no body, no attachments, no inline
+// images). Enough to decide whether a message is worth downloading at all.
+export interface MailEnvelope {
   uid: number
   from: string // sender address (as received; matching is case-insensitive)
   subject: string
   date: string // ISO; the fetchedAt fallback when a posting has no date
+  messageId: string | null // RFC822 Message-ID header — used to deep-link Gmail
+}
+
+// One decoded message pulled from the inbox: its envelope plus the decoded
+// body parts. Parsers prefer `html` and fall back to `text`.
+export interface MailMessage extends MailEnvelope {
   html: string | null
   text: string | null
-  messageId: string | null // RFC822 Message-ID header — used to deep-link Gmail
 }
 
 // The mailbox search window — constrained by mailbox + date only. We no longer
@@ -26,12 +31,25 @@ export interface MailSearchQuery {
   since: Date
 }
 
+// Fetch bodies for an explicit set of messages, in one mailbox.
+export interface MailFetchRequest {
+  mailbox: string
+  uids: number[]
+}
+
 // The seam between this module and the outside world: the real implementation
-// wraps imapflow, tests pass a fake. Lifecycle is connect → search → close,
-// and readRecentMessages guarantees close() runs even when search() throws.
+// wraps imapflow, tests pass a fake.
+//
+// The read is deliberately TWO-PHASE. Downloading every message in the window
+// and discarding the already-scanned ones afterwards meant re-downloading the
+// full 30-day archive on every sync — ~100 s and tens of MB to discover there
+// was nothing new. `listEnvelopes` fetches headers only (cheap); the caller
+// filters those against its scanned-message memory and then asks for the
+// bodies of the survivors alone.
 export interface MailDriver {
   connect(): Promise<void>
-  search(query: MailSearchQuery): Promise<MailMessage[]>
+  listEnvelopes(query: MailSearchQuery): Promise<MailEnvelope[]>
+  fetchMessages(request: MailFetchRequest): Promise<MailMessage[]>
   close(): Promise<void>
 }
 
@@ -52,17 +70,32 @@ export interface ReadRecentOptions {
   since: Date
 }
 
-// Connect, search the window, return every message, and always close the
-// connection. Pure orchestration over the injected driver — no imapflow import
-// here, so it unit-tests against a fake with zero I/O. No sender filtering: the
-// LLM sees every recent email and decides what holds jobs.
-export async function readRecentMessages(
+// Phase 1: headers for everything in the window. No sender filtering — the LLM
+// decides what holds jobs; this only decides what is worth downloading.
+export async function readRecentEnvelopes(
   driver: MailDriver,
   options: ReadRecentOptions,
-): Promise<MailMessage[]> {
+): Promise<MailEnvelope[]> {
   await driver.connect()
   try {
-    return await driver.search({ mailbox: options.mailbox, since: options.since })
+    return await driver.listEnvelopes({ mailbox: options.mailbox, since: options.since })
+  } finally {
+    await driver.close()
+  }
+}
+
+// Phase 2: full bodies, for the chosen messages only. Both helpers are pure
+// orchestration over the injected driver — no imapflow import here, so they
+// unit-test against a fake with zero I/O — and both guarantee close() runs
+// even when the driver throws.
+export async function readMessages(
+  driver: MailDriver,
+  request: MailFetchRequest,
+): Promise<MailMessage[]> {
+  if (request.uids.length === 0) return []
+  await driver.connect()
+  try {
+    return await driver.fetchMessages(request)
   } finally {
     await driver.close()
   }

@@ -171,7 +171,7 @@ describe('listFeed', () => {
     )
   })
 
-  it('defaults: newest first, nulls last, hidden excluded, limit 200', async () => {
+  it('defaults: newest first, nulls last, hidden excluded, no row cap', async () => {
     const feed = await listFeed(db, {})
     expect(feed.map((job) => job.id)).toEqual([
       'ba:onsite',
@@ -282,6 +282,24 @@ describe('listFeed', () => {
       'himalayas:eu',
       'remoteok:ww',
     ])
+  })
+
+  // The feed used to stop at 200 rows, so a growing database silently returned
+  // the same 200 forever — new jobs could only displace old ones.
+  it('returns every matching row when no limit is asked for', async () => {
+    const extra = Array.from({ length: 260 }, (_, i) =>
+      makeJob({
+        id: `ba:bulk-${i}`,
+        dedupeKey: `bulk-${i}`,
+        postedAt: new Date(Date.UTC(2026, 0, 1, 0, i)).toISOString(),
+      }),
+    )
+    await upsertJobs(db, extra, T0)
+
+    const feed = await listFeed(db, {})
+
+    expect(feed.length).toBe(264) // 260 bulk + the 4 seeded
+    expect(feed.filter((job) => job.id.startsWith('ba:bulk-'))).toHaveLength(260)
   })
 
   it('combines filters with AND', async () => {

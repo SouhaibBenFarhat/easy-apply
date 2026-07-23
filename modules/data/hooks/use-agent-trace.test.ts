@@ -38,6 +38,36 @@ describe('useAgentTrace', () => {
     expect(result.current.data?.map((event) => event.label)).toEqual(['Sync started', 'Prompt'])
   })
 
+  // seq restarts at 0 for each pass — a new run must wipe the previous run's
+  // timeline, not append to it.
+  it('starts a fresh timeline when a new run begins', async () => {
+    const mock = setupMockElectron()
+    const emit = createAgentTraceEmitter(mock)
+    const client = createTestQueryClient()
+    const { result } = renderHook(
+      () => {
+        useAgentTraceCollector()
+        return useAgentTrace()
+      },
+      { client },
+    )
+
+    act(() => {
+      emit({ seq: 0, at: '2026-07-21T09:00:00.000Z', channel: 'sync', label: 'Sync started' })
+      emit({ seq: 1, at: '2026-07-21T09:00:09.000Z', channel: 'sync', label: 'Sync finished' })
+      emit({ seq: 0, at: '2026-07-21T10:00:00.000Z', channel: 'sync', label: 'Sync started' })
+      emit({ seq: 1, at: '2026-07-21T10:00:01.000Z', channel: 'mailbox', label: 'Connecting…' })
+    })
+
+    await waitFor(() =>
+      expect(result.current.data?.map((event) => event.label)).toEqual([
+        'Sync started',
+        'Connecting…',
+      ]),
+    )
+    expect(result.current.data?.[0]?.at).toBe('2026-07-21T10:00:00.000Z')
+  })
+
   // The mailbox agent upserts each email's jobs as it goes, so the feed has to
   // re-read mid-run. Waiting for sync:completed left it looking empty for the
   // whole (hour-long) scan.
@@ -54,6 +84,9 @@ describe('useAgentTrace', () => {
       channel: 'pipeline',
       label: `Subject ${seq}`,
       stats: {
+        phase: 'scanning',
+        phaseDone: 0,
+        phaseTotal: 0,
         emailsTotal: 10,
         emailsProcessed: seq,
         emailsAccepted: jobsKept,

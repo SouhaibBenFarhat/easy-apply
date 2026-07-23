@@ -1,5 +1,12 @@
 import { createLogger } from '@logger/main'
-import type { MailAccount, MailDriver, MailMessage, MailSearchQuery } from '@sources/main'
+import type {
+  MailAccount,
+  MailDriver,
+  MailEnvelope,
+  MailFetchRequest,
+  MailMessage,
+  MailSearchQuery,
+} from '@sources/main'
 import { ImapFlow } from 'imapflow'
 import { simpleParser } from 'mailparser'
 
@@ -52,13 +59,52 @@ export function createImapMailDriver(account: MailAccount): MailDriver {
     connect: async (): Promise<void> => {
       await client.connect()
     },
-    search: async (query: MailSearchQuery): Promise<MailMessage[]> => {
-      const messages: MailMessage[] = []
+    // Phase 1: headers only. `envelope` is a parsed header record — no body,
+    // no attachments, no inline images cross the wire, which is what makes a
+    // 30-day window cost seconds instead of ~100 s.
+    listEnvelopes: async (query: MailSearchQuery): Promise<MailEnvelope[]> => {
+      const envelopes: MailEnvelope[] = []
       // Prefer Gmail's All Mail so filtered/labeled alerts are included.
       const path = await resolveMailboxPath(client, query.mailbox)
       const lock = await client.getMailboxLock(path)
       try {
-        for await (const message of client.fetch({ since: query.since }, { source: true })) {
+        for await (const message of client.fetch({ since: query.since }, { envelope: true })) {
+          const envelope = message.envelope
+          if (envelope === undefined) continue
+          const sender = envelope.from?.[0]
+          envelopes.push({
+            uid: message.uid,
+            // imapflow splits the address; rebuild the "Name <addr>" form the
+            // rest of the pipeline (and the funnel's sender line) expects.
+            from:
+              sender === undefined
+                ? ''
+                : sender.name
+                  ? `${sender.name} <${sender.address ?? ''}>`
+                  : (sender.address ?? ''),
+            subject: envelope.subject ?? '',
+            date: (envelope.date ?? new Date()).toISOString(),
+            messageId: envelope.messageId ?? null,
+          })
+        }
+      } finally {
+        lock.release()
+      }
+      return envelopes
+    },
+
+    // Phase 2: full source for an explicit UID set — only the messages the
+    // caller actually intends to scan.
+    fetchMessages: async (request: MailFetchRequest): Promise<MailMessage[]> => {
+      const messages: MailMessage[] = []
+      const path = await resolveMailboxPath(client, request.mailbox)
+      const lock = await client.getMailboxLock(path)
+      try {
+        for await (const message of client.fetch(
+          request.uids.join(','),
+          { source: true },
+          { uid: true },
+        )) {
           const source = message.source
           if (source === undefined) continue
           const parsed = await simpleParser(source)

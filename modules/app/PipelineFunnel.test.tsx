@@ -1,9 +1,12 @@
 import type { AgentPipelineStats, AgentState } from '@data'
-import { render, screen, userEvent } from '@test-utils'
+import { act, render, screen, userEvent } from '@test-utils'
 import { PipelineFunnel } from './PipelineFunnel'
 
 function stats(overrides: Partial<AgentPipelineStats> = {}): AgentPipelineStats {
   return {
+    phase: 'scanning',
+    phaseDone: 0,
+    phaseTotal: 0,
     emailsTotal: 10,
     emailsProcessed: 4,
     emailsAccepted: 3,
@@ -21,17 +24,18 @@ function stats(overrides: Partial<AgentPipelineStats> = {}): AgentPipelineStats 
 const NOOP = (): void => {}
 
 function renderFunnel(
-  props: { stats?: AgentPipelineStats; state?: AgentState } & Partial<{
+  props: { stats?: AgentPipelineStats; state?: AgentState; stepStartedAt?: string } & Partial<{
     onStop: () => void
     onPause: () => void
     onResume: () => void
   }> = {},
 ): ReturnType<typeof render> {
-  const { stats: seed = stats(), state = 'running', ...handlers } = props
+  const { stats: seed = stats(), state = 'running', stepStartedAt, ...handlers } = props
   return render(
     <PipelineFunnel
       stats={seed}
       state={state}
+      {...(stepStartedAt === undefined ? {} : { stepStartedAt })}
       onStop={handlers.onStop ?? NOOP}
       onPause={handlers.onPause ?? NOOP}
       onResume={handlers.onResume ?? NOOP}
@@ -47,8 +51,16 @@ describe('PipelineFunnel', () => {
     expect(screen.getByText('4 / 10')).toBeInTheDocument()
     expect(screen.getByText('Accepted')).toBeInTheDocument()
     expect(screen.getByText('Rejected')).toBeInTheDocument()
-    expect(screen.getByText('Jobs found')).toBeInTheDocument()
+    expect(screen.getByText('Found')).toBeInTheDocument()
     expect(screen.getByText('Kept')).toBeInTheDocument()
+  })
+
+  // The counters mix two units — emails on one row, jobs on the other — which
+  // is unreadable unless the grid says so.
+  it('groups the counters under their unit', () => {
+    renderFunnel()
+    expect(screen.getByText('Emails')).toBeInTheDocument()
+    expect(screen.getByText('Jobs')).toBeInTheDocument()
   })
 
   it('shows the email currently under analysis', () => {
@@ -75,6 +87,83 @@ describe('PipelineFunnel', () => {
       'href',
       'https://mail.google.com/mail/u/me%40gmail.com/#search/rfc822msgid%3Ax',
     )
+  })
+
+  // Progress is REAL in every phase — measured in whatever that phase counts:
+  // inboxes, triage batches, then emails. A permanent sweep would tell the user
+  // nothing, which is exactly the complaint this replaced.
+  it.each([
+    ['reading', 'Reading inbox', 1, 2, '50'],
+    ['triaging', 'Triaging', 3, 4, '75'],
+    ['downloading', 'Downloading', 1, 1, '100'],
+  ] as const)(
+    'fills the bar in the %s phase using that phase own units',
+    (phase, label, phaseDone, phaseTotal, pct) => {
+      renderFunnel({
+        stats: stats({ phase, phaseDone, phaseTotal, emailsTotal: 0, emailsProcessed: 0 }),
+      })
+
+      const bar = screen.getByRole('progressbar')
+      expect(bar).toHaveAttribute('aria-valuenow', pct)
+      expect(bar.firstElementChild?.className).not.toContain('animate-progress-sweep')
+      expect(screen.getByText(`${phaseDone} / ${phaseTotal}`)).toBeInTheDocument()
+      // The phase is named alongside the count, never instead of it.
+      expect(screen.getByText(label)).toBeInTheDocument()
+    },
+  )
+
+  it('switches to counting emails once scanning starts', () => {
+    // Phase counters are stale from the previous phase; scanning ignores them.
+    renderFunnel({ stats: stats({ phase: 'scanning', phaseDone: 1, phaseTotal: 4 }) })
+
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '40')
+    expect(screen.getByText('4 / 10')).toBeInTheDocument()
+    expect(screen.getByText('Scanning')).toBeInTheDocument()
+  })
+
+  // The sweep is the last resort — a phase that truly has no total yet, which
+  // lasts a moment at most.
+  it('sweeps only while a phase has no total at all', () => {
+    renderFunnel({ stats: stats({ phase: 'reading', phaseDone: 0, phaseTotal: 0 }) })
+
+    const bar = screen.getByRole('progressbar')
+    expect(bar).not.toHaveAttribute('aria-valuenow')
+    expect(bar.firstElementChild?.className).toContain('animate-progress-sweep')
+  })
+
+  // The front-and-center step clock: how long the in-flight email has been
+  // running, ticking each second right beside its subject.
+  it('ticks a live clock beside the email under analysis', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-21T09:00:20.000Z'))
+    try {
+      renderFunnel({
+        stats: stats({
+          current: { subject: 'Backend roles for you', sender: 'jobs@linkedin.com', url: null },
+        }),
+        stepStartedAt: '2026-07-21T09:00:15.000Z',
+      })
+      expect(screen.getByLabelText('Current step running for')).toHaveTextContent('0:05')
+      act(() => {
+        vi.advanceTimersByTime(3_000)
+      })
+      expect(screen.getByLabelText('Current step running for')).toHaveTextContent('0:08')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // A held run executes nothing, so it counts nothing.
+  it('hides the step clock while the run is held', () => {
+    renderFunnel({
+      state: 'paused',
+      stats: stats({
+        paused: true,
+        current: { subject: 'Backend roles for you', sender: 'jobs@linkedin.com', url: null },
+      }),
+      stepStartedAt: '2026-07-21T09:00:15.000Z',
+    })
+    expect(screen.queryByLabelText('Current step running for')).not.toBeInTheDocument()
   })
 
   it('shows a capped badge when the inbox was truncated', () => {

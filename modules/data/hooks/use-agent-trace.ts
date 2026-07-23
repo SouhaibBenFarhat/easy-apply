@@ -17,7 +17,9 @@ export function useAgentTraceCollector(): void {
   useEffect(() => {
     return window.electron.agent.onTrace((event) => {
       client.setQueryData<AgentTraceEvent[]>(keys.agent.trace, (prev = []) =>
-        [...prev, event].slice(-MAX_TRACE),
+        // seq restarts at 0 for each pass (src/main/sync.ts): a new run starts
+        // a fresh timeline instead of appending to the previous run's.
+        event.seq === 0 ? [event] : [...prev, event].slice(-MAX_TRACE),
       )
       // The mailbox agent upserts each email's jobs as it goes, but the only
       // invalidation used to be on 'sync:completed' — so a scan that takes an
