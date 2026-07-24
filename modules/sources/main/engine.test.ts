@@ -286,6 +286,7 @@ describe('runSync — failure isolation', () => {
     expect(traces).toContainEqual({
       channel: 'sync',
       label: 'ba failed — sync aborted for this source',
+      status: 'failed',
       body: 'connection reset mid-scan',
     })
   })
@@ -386,19 +387,19 @@ describe('runSync — skipping', () => {
   })
 
   it('falls back to meta.enabledByDefault when no provider_state row exists', async () => {
-    const adzuna = makeProvider({
-      id: 'adzuna',
-      pages: [[makeJob('adzuna:1')]],
+    const jooble = makeProvider({
+      id: 'jooble',
+      pages: [[makeJob('jooble:1')]],
       enabledByDefault: false,
     })
 
-    const skipped = await runSync(makeDeps([adzuna]))
-    expect(skipped.perSource[0]).toMatchObject({ sourceId: 'adzuna', skipped: true })
+    const skipped = await runSync(makeDeps([jooble]))
+    expect(skipped.perSource[0]).toMatchObject({ sourceId: 'jooble', skipped: true })
 
     // An explicit enabled=true row overrides the meta default.
-    await setProviderEnabled(db, 'adzuna', true)
-    const run = await runSync(makeDeps([adzuna]))
-    expect(run.perSource[0]).toMatchObject({ sourceId: 'adzuna', skipped: false, inserted: 1 })
+    await setProviderEnabled(db, 'jooble', true)
+    const run = await runSync(makeDeps([jooble]))
+    expect(run.perSource[0]).toMatchObject({ sourceId: 'jooble', skipped: false, inserted: 1 })
   })
 
   it('only runs the providers named in options.only', async () => {

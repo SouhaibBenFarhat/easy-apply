@@ -9,12 +9,12 @@ Job hunting means six tabs, six logins, and the same posting three times. EasyAp
 
 ## Features
 
-- **Six sources, one feed** — Arbeitsagentur, Adzuna, Arbeitnow, Himalayas, RemoteOK, WeWorkRemotely. Official APIs and feeds only, no scraping.
+- **Five sources, one feed** — Arbeitsagentur, Arbeitnow, Himalayas, RemoteOK, WeWorkRemotely. Official APIs and feeds only, no scraping.
 - **Your job-alert inbox** — connect a Gmail account (IMAP + App Password) and an on-device LLM reads every recent email, extracts the job postings, and tags them by board (LinkedIn, Indeed, StepStone, Xing, …). Local-only and deletable.
 - **On-device AI, nothing leaves your Mac** — the model downloads once with a progress bar and runs fully offline. Choose **Llama 3.1 8B** (fast, the default) or **DeepSeek-R1 14B** (a reasoning model), switch anytime, and toggle AI off from the header to free its RAM.
 - **Watch the agent work** — an activity panel shows a live funnel (emails scanned → accepted/rejected → jobs found → kept), streams the model's reasoning when it thinks, and offers a **Stop** to cut a run mid-scan.
 - **Munich + remote Europe** — a search profile (city, radius, keywords, remote scopes) drives every source; cross-source duplicates collapse into one row.
-- **Salary up front** — a copper badge on every posting that states pay; Adzuna's model estimates are marked `~`.
+- **Salary up front** — a copper figure on every posting that states pay; structured-salary sources (Himalayas) surface real numbers.
 - **Application tracker** — Interested → Applied → Interview → Rejected, with notes. A job is never lost or applied to twice.
 - **Polite by design** — per-source rate limits, spaced sequential requests, and a "via {Source} ↗" attribution link on every posting.
 - **Everything stays local** — jobs live in a PGlite database on disk, API keys and app passwords are OS-encrypted, no accounts, no telemetry.

@@ -1,5 +1,5 @@
-import type { NormalizedJob } from '@sources/shared'
-import { describeError } from '@sources/shared'
+import type { NormalizedJob, SourceId } from '@sources/shared'
+import { DEFAULT_MAIL_SCAN_CONFIG, describeError, isExcludedSender } from '@sources/shared'
 import type { MailAccount, MailEnvelope, MailMessage } from '../mail'
 import { describeMailError, readMessages, readRecentEnvelopes } from '../mail'
 import { extractJobsFromEmail } from '../mail-extract'
@@ -12,6 +12,7 @@ import type {
   ProviderMeta,
   RawPayload,
   TraceFn,
+  TraceStatus,
 } from '../types'
 
 // Email job ingestion — reads the user's own inbox(es) over IMAP and hands
@@ -60,18 +61,20 @@ function toMailAccount(account: MailboxAccount): MailAccount {
 }
 
 // Emit a 'pipeline' trace carrying a fresh snapshot of the funnel counts.
-// `durationMs` rides along on rows that complete a step (verdicts, Done).
+// `durationMs` rides along on rows that complete a step (verdicts, Done);
+// `status` states the outcome (default 'done') so the dot never guesses it.
 function emitStats(
   trace: TraceFn | undefined,
   label: string,
   stats: AgentPipelineStats,
-  durationMs?: number,
+  extra: { durationMs?: number; status?: TraceStatus } = {},
 ): void {
   trace?.({
     channel: 'pipeline',
     label,
     stats: { ...stats },
-    ...(durationMs === undefined ? {} : { durationMs }),
+    ...(extra.durationMs === undefined ? {} : { durationMs: extra.durationMs }),
+    ...(extra.status === undefined ? {} : { status: extra.status }),
   })
 }
 
@@ -80,6 +83,22 @@ function emitStats(
 // triage reports its first batch, so the bar never sits at an unknown total.
 function countTriageChunks(freshCount: number): number {
   return Math.max(1, Math.ceil(freshCount / TRIAGE_CHUNK_SIZE))
+}
+
+// The board an extracted job came from, display-cased for the pipeline row.
+// The id is inferred from the apply-URL host (mail-extract.ts); anything else
+// is the generic inbox source.
+const SOURCE_LABELS: Partial<Record<SourceId, string>> = {
+  linkedin: 'LinkedIn',
+  indeed: 'Indeed',
+  stepstone: 'StepStone',
+  xing: 'XING',
+  glassdoor: 'Glassdoor',
+  instaffo: 'Instaffo',
+  mailbox: 'Inbox',
+}
+function sourceLabel(id: SourceId): string {
+  return SOURCE_LABELS[id] ?? id
 }
 
 // Trim a subject to a single-line trace label.
@@ -115,7 +134,7 @@ export const mailboxProvider: JobSourceProvider = {
     const { createMail, llm } = ctx
     if (createMail === undefined || llm === undefined) {
       ctx.logger.debug('mailbox: mail/LLM runtime unavailable — skipping')
-      ctx.trace?.({ channel: 'mailbox', label: 'Skipped — model not installed' })
+      ctx.trace?.({ channel: 'mailbox', label: 'Skipped — model not installed', status: 'skipped' })
       return []
     }
 
@@ -161,12 +180,9 @@ export const mailboxProvider: JobSourceProvider = {
           since,
         })
         stats.phaseDone += 1
-        emitStats(
-          ctx.trace,
-          `Found ${found.length} email(s) in ${account.email}`,
-          stats,
-          Date.now() - readStartedAt,
-        )
+        emitStats(ctx.trace, `Found ${found.length} email(s) in ${account.email}`, stats, {
+          durationMs: Date.now() - readStartedAt,
+        })
         envelopes.push(...found.map((envelope) => ({ envelope, accountEmail: account.email })))
       } catch (error) {
         // One inbox failing (bad password, IMAP hiccup) never sinks the rest.
@@ -177,6 +193,7 @@ export const mailboxProvider: JobSourceProvider = {
         ctx.trace?.({
           channel: 'mailbox',
           label: `Inbox read failed — ${account.email}`,
+          status: 'failed',
           body: message,
           stats: { ...stats },
           durationMs: Date.now() - readStartedAt,
@@ -184,12 +201,27 @@ export const mailboxProvider: JobSourceProvider = {
       }
     }
 
+    // HARD EXCLUSION — the user turned these senders off on the Sources page.
+    // Their emails are dropped here, before dedupe/triage/download, so no new
+    // jobs ever come from them (already-found jobs are untouched in the DB).
+    const scanConfig = ctx.mailScan ?? DEFAULT_MAIL_SCAN_CONFIG
+    const excludedCount = envelopes.filter(({ envelope }) =>
+      isExcludedSender(envelope.from, scanConfig),
+    ).length
+    const allowed = envelopes.filter(({ envelope }) => !isExcludedSender(envelope.from, scanConfig))
+    if (excludedCount > 0)
+      ctx.trace?.({
+        channel: 'mailbox',
+        label: `Excluded ${excludedCount} email(s) from off senders`,
+        status: 'skipped',
+      })
+
     // Only scan NEW mail: drop anything already processed in a past sync, and
     // take the most-recent first so the per-run cap keeps the freshest alerts.
     // Filtering on HEADERS is the point — bodies are downloaded after this, so
     // a window that is 90% already-scanned costs 10% of the download.
     const seen = ctx.processedMessages
-    const fresh = envelopes
+    const fresh = allowed
       .filter(
         ({ envelope }) =>
           envelope.messageId === null || seen === undefined || !seen.has(envelope.messageId),
@@ -212,6 +244,7 @@ export const mailboxProvider: JobSourceProvider = {
     const triage = await triageEnvelopes(
       fresh.map(({ envelope }) => envelope),
       {
+        config: scanConfig,
         ...(llm === undefined ? {} : { llm }),
         ...(ctx.signal === undefined ? {} : { signal: ctx.signal }),
         onChunk: (done, total) => {
@@ -277,6 +310,7 @@ export const mailboxProvider: JobSourceProvider = {
         ctx.trace?.({
           channel: 'mailbox',
           label: `Inbox read failed — ${account.email}`,
+          status: 'failed',
           body: message,
           stats: { ...stats },
         })
@@ -321,7 +355,7 @@ export const mailboxProvider: JobSourceProvider = {
         ctx.trace,
         `Stopped — ${stats.jobsKept} job(s) from ${stats.emailsProcessed}/${stats.emailsTotal} emails`,
         stats,
-        Date.now() - scanStartedAt,
+        { durationMs: Date.now() - scanStartedAt },
       )
       return ctx.saveJobs !== undefined ? [] : [{ kind: 'jobs', body: JSON.stringify(jobs) }]
     }
@@ -397,6 +431,8 @@ export const mailboxProvider: JobSourceProvider = {
             id: job.id,
             title: job.title,
             company: job.company,
+            location: job.city ?? (job.locationRaw.trim() || null),
+            source: sourceLabel(job.sourceId),
             url: job.applyUrl ?? job.url,
           })),
           durationMs: Date.now() - emailStartedAt,
@@ -415,15 +451,14 @@ export const mailboxProvider: JobSourceProvider = {
         stats.current = null
         // The email is deliberately NOT marked processed: a transient failure
         // (DB hiccup, model glitch) gets another chance on the next sync.
-        emitStats(
-          ctx.trace,
-          `${clip(message.subject)} · failed — skipped`,
-          stats,
-          Date.now() - emailStartedAt,
-        )
+        emitStats(ctx.trace, `${clip(message.subject)} · failed`, stats, {
+          durationMs: Date.now() - emailStartedAt,
+          status: 'failed',
+        })
         ctx.trace?.({
           channel: 'mailbox',
           label: `Email failed — ${clip(message.subject)}`,
+          status: 'failed',
           body: reason,
         })
       }
@@ -440,7 +475,9 @@ export const mailboxProvider: JobSourceProvider = {
       ctx.trace,
       `Done — ${stats.jobsKept} job(s) from ${stats.emailsTotal} email(s)`,
       stats,
-      Date.now() - scanStartedAt,
+      {
+        durationMs: Date.now() - scanStartedAt,
+      },
     )
     return ctx.saveJobs !== undefined ? [] : [{ kind: 'jobs', body: JSON.stringify(jobs) }]
   },

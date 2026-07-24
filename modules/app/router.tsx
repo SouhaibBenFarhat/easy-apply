@@ -10,6 +10,7 @@ import {
 } from '@tanstack/react-router'
 import { TrackerPage } from '@tracker'
 import { RootLayout } from './RootLayout'
+import { RunsPage } from './RunsPage'
 
 // Every route carries its header title.
 declare module '@tanstack/react-router' {
@@ -51,7 +52,20 @@ const settingsRoute = createRoute({
   staticData: { title: 'Settings' },
 })
 
-const routeTree = rootRoute.addChildren([feedRoute, trackerRoute, sourcesRoute, settingsRoute])
+const runsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/runs',
+  component: RunsPage,
+  staticData: { title: 'Runs' },
+})
+
+const routeTree = rootRoute.addChildren([
+  feedRoute,
+  trackerRoute,
+  sourcesRoute,
+  runsRoute,
+  settingsRoute,
+])
 
 // A fresh router per call: memory history is stateful, and tests need
 // isolated instances. Typed as AnyRouter (no Register augmentation): nav is

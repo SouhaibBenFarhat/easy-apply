@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-// The user's search intent — consumed by every provider (BA/Adzuna use
+// The user's search intent — consumed by every provider (BA uses
 // keywords + city/radius; remote boards use remoteScopes). Defaults exist so
 // PRs 6–9 code against real values before the Settings UI lands (PR 11).
 // Zod schemas stay module-internal (isolatedDeclarations); consumers use the

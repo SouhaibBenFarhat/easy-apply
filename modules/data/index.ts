@@ -8,6 +8,8 @@ export type {
   FeedFilters,
   JobSalary,
   JobStatus,
+  MailScanConfig,
+  MailScanDomain,
   NormalizedJob,
   RemoteScope,
   SalaryPeriod,
@@ -19,6 +21,9 @@ export type {
 export type {
   AgentPhase,
   AgentPipelineStats,
+  AgentRunStatus,
+  AgentRunSummary,
+  AgentRunTrigger,
   AgentState,
   AgentTraceEvent,
   AgentTraceJob,
@@ -34,6 +39,7 @@ export type {
   SyncRun,
   SyncStatus,
   SyncSummary,
+  TraceStatus,
 } from '../../src/preload/electron-api'
 export {
   createQueryClient,
@@ -88,7 +94,7 @@ export {
 } from './mutations/sources'
 export { useSyncNow } from './mutations/sync'
 export { useSetTheme } from './mutations/theme'
-export { useAgentState } from './queries/agent'
+export { useAgentRunSteps, useAgentRuns, useAgentState } from './queries/agent'
 export { useFeed, useJob } from './queries/jobs'
 export {
   DEFAULT_PANEL_WIDTHS,

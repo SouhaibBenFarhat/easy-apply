@@ -1,9 +1,11 @@
 import type { SourceId, SourceInfo, SyncRun } from '@data'
 import {
   useAddMailboxAccount,
+  useAppSettings,
   useClearSourceKey,
   useMailboxAccounts,
   useRemoveMailboxAccount,
+  useSetAppSettings,
   useSetSourceEnabled,
   useSetSourceKey,
   useSources,
@@ -14,6 +16,7 @@ import { Unplug } from 'lucide-react'
 import type { ReactElement } from 'react'
 import { useMemo } from 'react'
 import { MailboxCard } from '../MailboxCard'
+import { MailFilterCard } from '../MailFilterCard'
 import { SourceCard } from '../SourceCard'
 import { SourcesSkeleton } from './SourcesSkeleton'
 
@@ -28,6 +31,8 @@ export function SourcesPage(): ReactElement {
   const mailboxAccounts = useMailboxAccounts()
   const addMailboxAccount = useAddMailboxAccount()
   const removeMailboxAccount = useRemoveMailboxAccount()
+  const settings = useAppSettings()
+  const setSettings = useSetAppSettings()
   const { toast } = useToast()
   const loading = useDeferredLoading(sources.isPending)
 
@@ -137,6 +142,12 @@ export function SourcesPage(): ReactElement {
                 />
               ),
             )}
+            {settings.data !== undefined ? (
+              <MailFilterCard
+                config={settings.data.mailScan}
+                onChange={(next) => setSettings.mutate({ mailScan: next })}
+              />
+            ) : null}
           </>
         )}
       </div>

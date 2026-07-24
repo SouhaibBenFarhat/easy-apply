@@ -1,6 +1,7 @@
 import type { FeedFilters, StoredJob } from '@sources/shared'
-import { DEFAULT_SEARCH_PROFILE, isAgentSource } from '@sources/shared'
+import { DEFAULT_MAIL_SCAN_CONFIG, DEFAULT_SEARCH_PROFILE, isAgentSource } from '@sources/shared'
 import type {
+  AgentRunSummary,
   AgentState,
   AgentTraceEvent,
   AppSettings,
@@ -27,6 +28,9 @@ export interface MockElectronSeed {
   mailboxAccounts?: string[]
   modelStatus?: ModelStatus
   agentState?: AgentState
+  agentRuns?: AgentRunSummary[]
+  // Steps keyed by run id, returned from agent.runSteps.
+  agentRunSteps?: Record<number, AgentTraceEvent[]>
 }
 
 const DEFAULT_MODEL_STATUS: ModelStatus = {
@@ -56,8 +60,8 @@ const DEFAULT_MODEL_STATUS: ModelStatus = {
   ],
 }
 
-// Sensible defaults mirroring the real registry (same order): the five
-// keyless sources enabled, Adzuna — the keyed source — disabled with no key.
+// Sensible defaults mirroring the real registry (same order): the five keyless
+// API sources enabled, plus the inbox agent (mailbox) disabled with no key.
 const DEFAULT_SOURCES: readonly SourceInfo[] = [
   {
     sourceId: 'ba',
@@ -108,22 +112,6 @@ const DEFAULT_SOURCES: readonly SourceInfo[] = [
     lastSyncAt: null,
     hasKey: false,
     attribution: { label: 'We Work Remotely', required: false },
-  },
-  {
-    sourceId: 'adzuna',
-    displayName: 'Adzuna',
-    homepage: 'https://www.adzuna.de',
-    enabledByDefault: false,
-    enabled: false,
-    lastSyncAt: null,
-    hasKey: false,
-    requiresKey: {
-      fields: [
-        { id: 'app_id', label: 'Application ID', hint: 'from developer.adzuna.com' },
-        { id: 'app_key', label: 'Application key', hint: 'from developer.adzuna.com' },
-      ],
-    },
-    attribution: { label: 'Jobs by Adzuna', required: true },
   },
   {
     sourceId: 'mailbox',
@@ -254,6 +242,7 @@ export function createMockElectron(seed: MockElectronSeed = {}): ElectronAPI {
   const settings: AppSettings = {
     searchProfile: DEFAULT_SEARCH_PROFILE,
     syncIntervalHours: 3,
+    mailScan: DEFAULT_MAIL_SCAN_CONFIG,
   }
   const jobs: StoredJob[] = (seed.jobs ?? []).map((job) => ({ ...job }))
   const providers: ProviderState[] = (seed.providers ?? []).map((state) => ({ ...state }))
@@ -351,6 +340,8 @@ export function createMockElectron(seed: MockElectronSeed = {}): ElectronAPI {
     stop: async () => ({ success: true, data: false }),
     pause: async () => ({ success: true, data: false }),
     resume: async () => ({ success: true, data: false }),
+    runs: async () => ({ success: true, data: seed.agentRuns ?? [] }),
+    runSteps: async (runId) => ({ success: true, data: seed.agentRunSteps?.[runId] ?? [] }),
   }
   traceListenersByNamespace.set(agent, traceListeners)
   stateListenersByNamespace.set(agent, stateListeners)

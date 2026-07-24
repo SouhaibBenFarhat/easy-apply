@@ -59,10 +59,9 @@ export function JobDetailPane({
   return (
     <div key={job.id} className="relative h-full min-h-0 animate-fade-in">
       <ScrollArea className="h-full">
-        {/* Sticky detail header (§sidebars): one step above the description
-            body (`surface`) as a translucent glass veil, so scrolled
-            content shows through it and signals there's more underneath. */}
-        <header className="sticky top-0 z-10 flex flex-col gap-2 border-b border-border bg-surface-hover/85 px-6 py-4 backdrop-blur-md">
+        {/* Sticky detail header (§sidebars): the frosted glass-panel material,
+            so the description scrolls visibly UNDER it. */}
+        <header className="glass-panel sticky top-0 z-10 flex flex-col gap-2 border-b border-border px-6 py-4">
           <h2 className="truncate text-lg font-semibold">{job.title}</h2>
           <p className="label-caps truncate">
             {job.company} · {job.city ?? job.locationRaw} · posted{' '}

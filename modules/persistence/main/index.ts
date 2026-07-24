@@ -3,6 +3,22 @@
 
 export { type AppDatabase, type CreateDatabaseOptions, createDatabase, type DrizzleDb } from './db'
 export {
+  type AgentRunStatus,
+  type AgentRunStep,
+  type AgentRunSummary,
+  type AgentRunTrigger,
+  type AppendAgentStepInput,
+  appendAgentStep,
+  type FinishAgentRunInput,
+  finishAgentRun,
+  getAgentRunSteps,
+  listAgentRuns,
+  pruneAgentRuns,
+  reconcileStaleRuns,
+  type StartAgentRunInput,
+  startAgentRun,
+} from './repositories/agent-runs'
+export {
   getJob,
   listFeed,
   setJobHidden,
@@ -24,4 +40,4 @@ export {
   type SyncRunResult,
   startSyncRun,
 } from './repositories/sync-runs'
-export { jobs, providerState, syncRuns } from './schema'
+export { agentRunSteps, agentRuns, jobs, providerState, syncRuns } from './schema'

@@ -1,3 +1,5 @@
+import type { MailScanConfig } from '@sources/shared'
+import { isIncludedSender, subjectMatchesKeywords } from '@sources/shared'
 import type { MailEnvelope } from './mail'
 import type { LlmClient } from './mail-extract'
 
@@ -11,44 +13,15 @@ import type { LlmClient } from './mail-extract'
 // to skip the ones that obviously aren't.
 //
 // Two stages, in order of cost:
-//   1. deterministic — known job-board senders and job words in the subject.
-//      Free, instant, and certain on the easy cases.
+//   1. deterministic — the user's ENABLED job-sender domains and subject
+//      keywords (mail-scan.ts). Free, instant, certain on the easy cases.
 //   2. the model — one batched call per chunk over whatever stage 1 could not
 //      decide, judging sender + subject.
 //
-// The rule that keeps the "read everything" design intact: **a sender may only
-// include, never exclude.** An unrecognized sender is not dropped; it goes to
-// the model. Nothing is skipped without a judgement.
-
-// Senders whose mail is job mail by definition. Matched as a substring of the
-// From header, so both "jobs@linkedin.com" and "LinkedIn <n@e.linkedin.com>"
-// hit. Adding a name here only ever ADDS emails to the scan.
-const JOB_SENDER_FRAGMENTS: readonly string[] = [
-  'linkedin.',
-  'indeed.',
-  'stepstone.',
-  'xing.',
-  'glassdoor.',
-  'instaffo.',
-  'arbeitnow.',
-  'himalayas.',
-  'weworkremotely.',
-  'remoteok.',
-  'join.com',
-  'jobs.',
-  'jobalert',
-  'jobagent',
-  'karriere',
-  'recruit',
-  'talent',
-  'hiring',
-]
-
-// Subject words that mark job mail across the languages this inbox sees.
-// Deliberately generous: a false positive costs one extraction, a false
-// negative loses a real posting.
-const JOB_SUBJECT_RE =
-  /\b(?:jobs?|stelle|stellen|stellenangebot|position|vacanc(?:y|ies)|vagas|karriere|career|hiring|recruit\w*|opportunit(?:y|ies)|bewerbung|apply|applied|application|opening|role|developer|engineer|praktikum|internship)\b/i
+// HARD EXCLUSION happens BEFORE triage (in the mailbox provider): an email from
+// a DISABLED domain is dropped and never reaches here. Among what remains, an
+// enabled sender may only include, never exclude — an unrecognized sender is not
+// dropped; it goes to the model.
 
 export type TriageDecision = 'sender' | 'subject' | 'model' | 'skipped'
 
@@ -62,11 +35,13 @@ export interface TriageResult {
   askedModel: number
 }
 
-// Stage 1. Returns true when the envelope is job mail beyond doubt.
-export function isObviousJobMail(envelope: MailEnvelope): boolean {
-  const from = envelope.from.toLowerCase()
-  if (JOB_SENDER_FRAGMENTS.some((fragment) => from.includes(fragment))) return true
-  return JOB_SUBJECT_RE.test(envelope.subject)
+// Stage 1. Returns true when the envelope is job mail beyond doubt, per the
+// user's enabled domains + keywords.
+export function isObviousJobMail(envelope: MailEnvelope, config: MailScanConfig): boolean {
+  return (
+    isIncludedSender(envelope.from, config) ||
+    subjectMatchesKeywords(envelope.subject, config.keywords)
+  )
 }
 
 // One line per undecided email, numbered so the model answers with numbers
@@ -109,6 +84,8 @@ export function parseTriageAnswer(completion: string, count: number): number[] |
 }
 
 export interface TriageOptions {
+  // The user's enabled domains + subject keywords for the deterministic pass.
+  config: MailScanConfig
   llm?: LlmClient
   signal?: AbortSignal
   // Emails per model call. Small enough that one malformed answer costs a
@@ -126,18 +103,15 @@ const MAX_TRIAGE_TOKENS = 300
 
 export async function triageEnvelopes(
   envelopes: MailEnvelope[],
-  options: TriageOptions = {},
+  options: TriageOptions,
 ): Promise<TriageResult> {
+  const { config } = options
   const decisions = new Map<number, TriageDecision>()
   const undecided: MailEnvelope[] = []
 
   for (const envelope of envelopes) {
-    if (isObviousJobMail(envelope)) {
-      const from = envelope.from.toLowerCase()
-      decisions.set(
-        envelope.uid,
-        JOB_SENDER_FRAGMENTS.some((fragment) => from.includes(fragment)) ? 'sender' : 'subject',
-      )
+    if (isObviousJobMail(envelope, config)) {
+      decisions.set(envelope.uid, isIncludedSender(envelope.from, config) ? 'sender' : 'subject')
     } else {
       undecided.push(envelope)
     }

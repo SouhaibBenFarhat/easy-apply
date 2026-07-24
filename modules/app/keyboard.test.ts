@@ -19,17 +19,19 @@ function press(key: string, init: KeyboardEventInit = {}): void {
 }
 
 describe('useAppKeyboard', () => {
-  it('navigates to the matching page on meta+1..4', () => {
+  it('navigates to the matching page on meta+1..5', () => {
     const router = createFakeRouter()
     renderHook(() => useAppKeyboard(router as unknown as AnyRouter))
     press('1')
     press('2')
     press('3')
     press('4')
+    press('5')
     expect(router.navigate.mock.calls).toEqual([
       [{ to: '/feed' }],
       [{ to: '/tracker' }],
       [{ to: '/sources' }],
+      [{ to: '/runs' }],
       [{ to: '/settings' }],
     ])
   })

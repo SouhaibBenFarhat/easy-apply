@@ -7,7 +7,6 @@ import type { RemoteScope } from './search-profile'
 
 export type SourceId =
   | 'ba'
-  | 'adzuna'
   | 'arbeitnow'
   | 'himalayas'
   | 'remoteok'
@@ -31,7 +30,6 @@ export type SourceId =
 
 export const SOURCE_IDS: readonly SourceId[] = [
   'ba',
-  'adzuna',
   'arbeitnow',
   'himalayas',
   'remoteok',

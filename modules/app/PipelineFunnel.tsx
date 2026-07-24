@@ -1,7 +1,7 @@
 import type { AgentPhase, AgentPipelineStats, AgentState } from '@data'
 import { cn, TransportControl } from '@ui-kit'
-import { Mail } from 'lucide-react'
-import type { ReactElement } from 'react'
+import { ChevronRight, Mail } from 'lucide-react'
+import { type ReactElement, useState } from 'react'
 import { formatElapsedClock } from './format-duration'
 import { useElapsedSince } from './hooks/use-elapsed-since'
 
@@ -112,10 +112,19 @@ export function PipelineFunnel({
       stepStartedAt !== undefined &&
       stats.current !== null,
   )
+  // The email funnel is secondary — collapsed by default, so Jobs is the one
+  // number the card always shows.
+  const [emailsOpen, setEmailsOpen] = useState(false)
 
   return (
-    <div className="shrink-0 px-3 pt-3">
-      <section className="rounded-lg border border-border bg-surface p-3" aria-label="Pipeline">
+    // The floating card, kept — rounded, bordered, low shadow — but now a
+    // FROSTED GLASS: a translucent surface-hover veil + backdrop-blur so the
+    // timeline rows scroll visibly UNDER it. Sticky so it floats in place while
+    // they scroll (engages only when the parent renders it inside the scroll
+    // area; the live panel + Runs timeline column do). Near-solid fallback where
+    // backdrop-filter is unsupported.
+    <div className="sticky top-0 z-10 shrink-0 px-3 pt-3">
+      <section className="glass-panel rounded-lg border border-border p-3" aria-label="Pipeline">
         <div className="mb-2 flex items-center gap-2">
           <span className="label-caps">Pipeline</span>
           {stats.capped ? (
@@ -199,17 +208,31 @@ export function PipelineFunnel({
             ) : null}
           </div>
         ) : null}
-        {/* Two units, said out loud. The old 2×2 grid counted EMAILS on one row
-            and JOBS on the other with nothing to say so, and gave "Accepted"
-            and "Kept" the same green — which read as one measure counted twice. */}
+        {/* Jobs is the headline number and always shows. The email funnel is
+            secondary detail — folded behind a disclosure to keep the card
+            calm; expand it to see accepted/rejected. */}
         <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-          <span className="label-caps col-span-2">Emails</span>
-          <StatChip dot="bg-success" label="Accepted" value={stats.emailsAccepted} />
-          <StatChip dot="bg-foreground-ghost" label="Rejected" value={stats.emailsRejected} />
-          <span className="label-caps col-span-2 mt-1.5">Jobs</span>
-          <StatChip dot="bg-info" label="Found" value={stats.jobsProposed} />
+          <StatChip dot="bg-info" label="Jobs found" value={stats.jobsProposed} />
           <StatChip dot="bg-success" label="Kept" value={stats.jobsKept} />
         </div>
+        <button
+          type="button"
+          aria-expanded={emailsOpen}
+          onClick={() => setEmailsOpen((open) => !open)}
+          className="mt-2 flex w-full items-center gap-1 text-[0.65rem] uppercase tracking-wide text-foreground-subtle transition-colors hover:text-foreground-muted"
+        >
+          <ChevronRight className={cn('size-3 transition-transform', emailsOpen && 'rotate-90')} />
+          Emails
+          <span className="ml-auto tabular-nums normal-case">
+            {stats.emailsProcessed}/{stats.emailsTotal}
+          </span>
+        </button>
+        {emailsOpen ? (
+          <div className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+            <StatChip dot="bg-success" label="Accepted" value={stats.emailsAccepted} />
+            <StatChip dot="bg-foreground-ghost" label="Rejected" value={stats.emailsRejected} />
+          </div>
+        ) : null}
       </section>
     </div>
   )

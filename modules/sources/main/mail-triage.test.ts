@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { DEFAULT_MAIL_SCAN_CONFIG } from '@sources/shared'
 import { describe, expect, it, vi } from 'vitest'
 import type { MailEnvelope } from './mail'
 import type { LlmClient } from './mail-extract'
@@ -8,6 +9,8 @@ import {
   parseTriageAnswer,
   triageEnvelopes,
 } from './mail-triage'
+
+const CONFIG = DEFAULT_MAIL_SCAN_CONFIG
 
 function env(uid: number, from: string, subject: string): MailEnvelope {
   return { uid, from, subject, date: '2026-07-21T09:00:00.000Z', messageId: `<m-${uid}@x>` }
@@ -31,14 +34,14 @@ describe('isObviousJobMail', () => {
     ['hello@random.io', '3 neue Stellen in München'],
     ['news@medium.com', 'Senior Engineer opening at Acme'],
   ])('flags %s / %s', (from, subject) => {
-    expect(isObviousJobMail(env(1, from, subject))).toBe(true)
+    expect(isObviousJobMail(env(1, from, subject), CONFIG)).toBe(true)
   })
 
   it.each([
     ['news@medium.com', 'Your weekly digest'],
     ['billing@stripe.com', 'Your receipt'],
   ])('leaves %s / %s undecided', (from, subject) => {
-    expect(isObviousJobMail(env(1, from, subject))).toBe(false)
+    expect(isObviousJobMail(env(1, from, subject), CONFIG)).toBe(false)
   })
 })
 
@@ -79,6 +82,7 @@ describe('triageEnvelopes', () => {
   it('resolves obvious mail deterministically and only asks about the rest', async () => {
     const prompts: string[] = []
     const result = await triageEnvelopes([jobMail, newsletter, receipt], {
+      config: CONFIG,
       llm: fakeLlm('[1]', prompts),
     })
 
@@ -94,7 +98,7 @@ describe('triageEnvelopes', () => {
   it('chunks the model calls and reports progress', async () => {
     const envelopes = Array.from({ length: 5 }, (_, i) => env(i + 1, 'a@unknown.io', 'hello there'))
     const onChunk = vi.fn()
-    await triageEnvelopes(envelopes, { llm: fakeLlm('[]'), chunkSize: 2, onChunk })
+    await triageEnvelopes(envelopes, { config: CONFIG, llm: fakeLlm('[]'), chunkSize: 2, onChunk })
     expect(onChunk.mock.calls).toEqual([
       [1, 3],
       [2, 3],
@@ -105,19 +109,23 @@ describe('triageEnvelopes', () => {
   // This filter can lose jobs, so every failure mode keeps mail rather than
   // dropping it.
   it('keeps the whole chunk when the model answer is unreadable', async () => {
-    const result = await triageEnvelopes([newsletter, receipt], { llm: fakeLlm('I think none') })
+    const result = await triageEnvelopes([newsletter, receipt], {
+      config: CONFIG,
+      llm: fakeLlm('I think none'),
+    })
     expect(result.selected.map((e) => e.uid)).toEqual([2, 3])
   })
 
   it('keeps the whole chunk when the model call throws', async () => {
     const result = await triageEnvelopes([newsletter, receipt], {
+      config: CONFIG,
       llm: fakeLlm(new Error('out of memory')),
     })
     expect(result.selected.map((e) => e.uid)).toEqual([2, 3])
   })
 
   it('scans everything when no model is available', async () => {
-    const result = await triageEnvelopes([newsletter, receipt], {})
+    const result = await triageEnvelopes([newsletter, receipt], { config: CONFIG })
     expect(result.selected.map((e) => e.uid)).toEqual([2, 3])
     expect(result.askedModel).toBe(0)
   })
@@ -126,6 +134,7 @@ describe('triageEnvelopes', () => {
     const controller = new AbortController()
     controller.abort()
     const result = await triageEnvelopes([newsletter, receipt], {
+      config: CONFIG,
       llm: fakeLlm('[]'),
       signal: controller.signal,
     })
@@ -134,7 +143,7 @@ describe('triageEnvelopes', () => {
 
   it('drops nothing that the model picked, and nothing it did not', async () => {
     const envelopes = [newsletter, receipt, env(4, 'a@unknown.io', 'hello')]
-    const result = await triageEnvelopes(envelopes, { llm: fakeLlm('[2]') })
+    const result = await triageEnvelopes(envelopes, { config: CONFIG, llm: fakeLlm('[2]') })
     expect(result.selected.map((e) => e.uid)).toEqual([3])
   })
 })

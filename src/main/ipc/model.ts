@@ -17,7 +17,10 @@ export interface ModelProgressEvent {
   done: boolean
 }
 
-export function registerModelIpc(manager: ModelManager, stopSync?: () => void): void {
+export function registerModelIpc(
+  manager: ModelManager,
+  stopSync?: () => void | Promise<void>,
+): void {
   const broadcast = (event: ModelProgressEvent): void => {
     for (const window of BrowserWindow.getAllWindows())
       window.webContents.send('model:progress', event)

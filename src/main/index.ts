@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { createLogger } from '@logger/main'
-import { type AppDatabase, createDatabase } from '@persistence/main'
+import { type AppDatabase, createDatabase, reconcileStaleRuns } from '@persistence/main'
 import { app, BrowserWindow } from 'electron'
 import { registerDbIpc } from './ipc/db'
 import { registerMailboxIpc } from './ipc/mailbox'
@@ -34,6 +34,33 @@ process.on('unhandledRejection', (reason) => {
 })
 
 let db: AppDatabase | undefined
+let modelManager: ModelManager | undefined
+let stopSync: (() => void | Promise<void>) | undefined
+// True once graceful shutdown has run, so the re-fired quit isn't intercepted.
+let didShutdown = false
+
+// Ordered teardown before the process exits. WITHOUT this, quit killed the
+// process while a llama generation was mid-flight (native SIGABRT — the
+// "Electron quit unexpectedly" dialog) and while PGlite was mid-write (a
+// half-written index = the jobs_pkey corruption). Order matters: stop the run
+// and let it unwind, unload the native model, THEN flush and close the DB.
+async function gracefulShutdown(): Promise<void> {
+  try {
+    await stopSync?.()
+  } catch (error) {
+    logger.error(`shutdown: stopSync failed — ${String(error)}`)
+  }
+  try {
+    await modelManager?.unloadLlm()
+  } catch (error) {
+    logger.error(`shutdown: model unload failed — ${String(error)}`)
+  }
+  try {
+    await db?.close()
+  } catch (error) {
+    logger.error(`shutdown: db close failed — ${String(error)}`)
+  }
+}
 
 function createWindow(): void {
   const bounds = store.get('windowBounds')
@@ -85,15 +112,20 @@ app.whenReady().then(async () => {
       ? join(process.resourcesPath, 'drizzle')
       : join(app.getAppPath(), 'drizzle'),
   })
+  // Any run still 'running' from a previous launch is a process that died
+  // mid-pass (crash, kill, quit) — mark it stopped so history stays honest.
+  await reconcileStaleRuns(db).catch((error) =>
+    logger.error(`reconcile stale runs failed: ${String(error)}`),
+  )
   registerDbIpc(db)
   registerSourcesIpc(db)
   registerMailboxIpc(db)
-  const modelManager = new ModelManager(undefined, store.get('modelId'))
+  modelManager = new ModelManager(undefined, store.get('modelId'))
   // Seed the persisted AI on/off preference (nothing is loaded yet, so no
   // dispose happens here).
   await modelManager.setAiEnabled(store.get('aiEnabled'))
   // installSync returns a stop handle so turning AI off also aborts a run.
-  const stopSync = installSync(db, modelManager)
+  stopSync = installSync(db, modelManager)
   registerModelIpc(modelManager, stopSync)
   createWindow()
   app.on('activate', () => {
@@ -101,8 +133,20 @@ app.whenReady().then(async () => {
   })
 })
 
-app.on('will-quit', () => {
-  void db?.close()
+// Intercept the FIRST quit, run the ordered async teardown, then really exit.
+// app.exit(0) skips the rest of the lifecycle so no native code is torn down
+// twice — the clean shutdown has already happened.
+// A generation that ignores the abort must not hang the quit forever. Bound the
+// whole teardown; the DB close is last and fast, so this only ever cuts off a
+// wedged native call.
+const SHUTDOWN_TIMEOUT_MS = 10_000
+
+app.on('before-quit', (event) => {
+  if (didShutdown) return
+  event.preventDefault()
+  didShutdown = true
+  const timeout = new Promise<void>((resolve) => setTimeout(resolve, SHUTDOWN_TIMEOUT_MS))
+  void Promise.race([gracefulShutdown(), timeout]).finally(() => app.exit(0))
 })
 
 app.on('window-all-closed', () => {

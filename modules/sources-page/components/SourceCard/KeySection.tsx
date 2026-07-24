@@ -69,11 +69,6 @@ export function KeySection({ source, onSaveKey, onClearKey }: KeySectionProps): 
               onSaveKey(values)
             }}
           />
-          {source.sourceId === 'adzuna' ? (
-            <p className="text-xs text-foreground-subtle">
-              Free key from developer.adzuna.com — the only Munich source with salary data.
-            </p>
-          ) : null}
         </>
       ) : null}
     </div>

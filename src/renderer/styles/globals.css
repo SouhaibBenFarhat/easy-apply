@@ -195,12 +195,31 @@
     box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.06);
   }
 
+  /*
+   * In-content frosted panel — the full Apple vibrancy material (heavy blur +
+   * saturation + a sheen), but on the `surface-hover` tone rather than the
+   * bright `--header`, so it stays inside the elevation ladder. For a STICKY
+   * card that content scrolls under (the pipeline funnel). More translucent
+   * than `.glass` so the rows read clearly through it.
+   */
+  .glass-panel {
+    background-color: oklch(var(--surface-hover) / 0.12);
+    -webkit-backdrop-filter: saturate(180%) blur(16px);
+    backdrop-filter: saturate(180%) blur(16px);
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.08),
+      var(--shadow-elevation-medium);
+  }
+
   @supports not (backdrop-filter: blur(1px)) {
     .glass {
       background-color: oklch(var(--header));
     }
     .glass-overlay {
       background-color: oklch(var(--overlay));
+    }
+    .glass-panel {
+      background-color: oklch(var(--surface-hover));
     }
   }
 

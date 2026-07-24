@@ -1,10 +1,30 @@
 import { createLogger } from '@logger/main'
-import type { AppDatabase, SyncRun } from '@persistence/main'
-import { listRecentSyncRuns } from '@persistence/main'
-import type { AgentTraceInput, LlmClient, SyncEvent, SyncSummary } from '@sources/main'
+import type { AgentRunStep, AgentRunSummary, AppDatabase, SyncRun } from '@persistence/main'
+import {
+  appendAgentStep,
+  finishAgentRun,
+  getAgentRunSteps,
+  listAgentRuns,
+  listRecentSyncRuns,
+  pruneAgentRuns,
+  startAgentRun,
+} from '@persistence/main'
+import type {
+  AgentPipelineStats,
+  AgentTraceInput,
+  LlmClient,
+  SyncEvent,
+  SyncSummary,
+} from '@sources/main'
 import { PoliteHttpClient, PROVIDERS, runSync, splitThinking } from '@sources/main'
 import type { IpcResult } from '@sources/shared'
-import { fail, ok, resolveSearchProfile } from '@sources/shared'
+import {
+  describeError,
+  fail,
+  ok,
+  resolveMailScanConfig,
+  resolveSearchProfile,
+} from '@sources/shared'
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { createLlamaClient } from './llm'
 import { createImapMailDriver } from './mail-driver'
@@ -41,6 +61,9 @@ const SYNC_REQUEST_GAP_MS = 1_200
 // How many scanned-mail ids to remember (most-recent-wins) so the store doesn't
 // grow without bound. ~30 days of mail fits comfortably.
 const PROCESSED_MAIL_CAP = 5_000
+// How many agent runs to keep in history — older runs (and their steps, which
+// include full prompt/response bodies) are pruned after each pass.
+const MAX_RUN_HISTORY = 50
 
 export function installSync(db: AppDatabase, modelManager: ModelManager): () => void {
   const logger = createLogger('sync')
@@ -81,6 +104,11 @@ export function installSync(db: AppDatabase, modelManager: ModelManager): () => 
   // every window over 'agent:trace'. seq restarts at 0 for every pass — the
   // renderer's collector treats a seq-0 event as "new run, wipe the timeline".
   let traceSeq = 0
+  // The run this pass is being persisted under, and the latest funnel snapshot
+  // seen — so the finished run row can report its email/job rollup. Both live
+  // for the duration of one pass (set in start(), cleared when it settles).
+  let currentRunId: number | null = null
+  let lastRunStats: AgentPipelineStats | null = null
   const traceEmit = (input: AgentTraceInput): void => {
     // A funnel snapshot is the provider ACKNOWLEDGING the hold: it flips
     // stats.paused at the checkpoint, which is the only moment 'pausing' can
@@ -89,9 +117,28 @@ export function installSync(db: AppDatabase, modelManager: ModelManager): () => 
       if (input.stats.paused) setAgentState('paused')
       else if (agentState === 'paused') setAgentState('running')
     }
+    if (input.stats !== undefined) lastRunStats = input.stats
     const event = { seq: traceSeq++, at: new Date().toISOString(), ...input }
     for (const window of BrowserWindow.getAllWindows())
       window.webContents.send('agent:trace', event)
+    // Persist the step (best-effort). Fire-and-forget so the DB write never
+    // stalls the live push; steps carry `seq`, so a slow insert still reads
+    // back in order. A failed write must never crash a sync.
+    if (currentRunId !== null) {
+      const runId = currentRunId
+      void appendAgentStep(db, runId, {
+        seq: event.seq,
+        at: event.at,
+        channel: event.channel,
+        label: event.label,
+        status: event.status ?? null,
+        chars: event.chars ?? null,
+        durationMs: event.durationMs ?? null,
+        body: event.body ?? null,
+        stats: event.stats ?? null,
+        jobs: event.jobs ?? null,
+      }).catch((error: unknown) => logger.error(`persist step failed: ${describeError(error)}`))
+    }
   }
 
   // Wrap the LLM so every extraction call surfaces its prompt (the context),
@@ -139,6 +186,8 @@ export function installSync(db: AppDatabase, modelManager: ModelManager): () => 
     releaseResume()
     // Fresh pass, fresh timeline: this pass's first event carries seq 0.
     traceSeq = 0
+    currentRunId = null
+    lastRunStats = null
     setAgentState('running')
     // Scanned-mail memory for this pass, so the mailbox agent only LLMs new
     // mail; persisted (capped, most-recent-wins) after the pass settles.
@@ -151,6 +200,18 @@ export function installSync(db: AppDatabase, modelManager: ModelManager): () => 
       // downloaded; null otherwise (off → RAM stays free, model skipped).
       const rawLlm = await modelManager.resolveLlm(createLlamaClient)
       passStartedAt = Date.now()
+      // Open the durable run row BEFORE the first step, so every step (from
+      // 'Sync started' on) is persisted under it. A failure here just means
+      // this pass isn't recorded — the live trace still works.
+      try {
+        currentRunId = await startAgentRun(db, {
+          trigger: force ? 'manual' : 'scheduled',
+          startedAt: new Date(passStartedAt).toISOString(),
+        })
+      } catch (error) {
+        currentRunId = null
+        logger.error(`open run failed: ${describeError(error)}`)
+      }
       traceEmit({
         channel: 'sync',
         label: force ? 'Sync started (manual)' : 'Sync started',
@@ -161,6 +222,7 @@ export function installSync(db: AppDatabase, modelManager: ModelManager): () => 
           providers: PROVIDERS,
           readConfig: (sourceId) => readProviderConfig(db, sourceId),
           getSearchProfile: async () => resolveSearchProfile(store.get('searchProfile')),
+          getMailScan: async () => resolveMailScanConfig(store.get('mailScan')),
           // A fresh client per provider: each source gets its own request
           // spacing window, and no throttle state leaks across sources.
           createHttp: () => new PoliteHttpClient({ minRequestGapMs: SYNC_REQUEST_GAP_MS }),
@@ -191,23 +253,50 @@ export function installSync(db: AppDatabase, modelManager: ModelManager): () => 
       )
     })()
     running = promise
+    // Close the run row to match how the pass actually ended, then prune old
+    // history. All best-effort: a failed record keeps the sync itself intact.
+    const closeRun = async (
+      status: 'completed' | 'stopped' | 'failed',
+      error?: string,
+    ): Promise<void> => {
+      const runId = currentRunId
+      if (runId === null) return
+      try {
+        await finishAgentRun(db, runId, {
+          status,
+          finishedAt: new Date().toISOString(),
+          emailsTotal: lastRunStats?.emailsTotal ?? 0,
+          emailsProcessed: lastRunStats?.emailsProcessed ?? 0,
+          jobsKept: lastRunStats?.jobsKept ?? 0,
+          error: error ?? null,
+        })
+        await pruneAgentRuns(db, MAX_RUN_HISTORY)
+      } catch (persistError) {
+        logger.error(`close run failed: ${describeError(persistError)}`)
+      }
+    }
     promise
-      .then((summary) => {
+      .then(async (summary) => {
         lastCompletedAt = summary.finishedAt
         traceEmit({
           channel: 'sync',
           label: `Sync finished · +${summary.inserted} new, ${summary.updated} updated`,
           durationMs: Date.now() - passStartedAt,
         })
+        // A pass that returned but was aborted mid-scan is a stop, not a
+        // completion — the transport state is the authority.
+        await closeRun(controller.signal.aborted ? 'stopped' : 'completed')
       })
-      .catch((error: unknown) => {
-        logger.error(`sync pass crashed: ${error instanceof Error ? error.message : String(error)}`)
+      .catch(async (error: unknown) => {
+        logger.error(`sync pass crashed: ${describeError(error)}`)
+        await closeRun('failed', describeError(error))
       })
       .finally(() => {
         running = null
         if (activeController === controller) activeController = null
         paused = false
         releaseResume()
+        currentRunId = null
         setAgentState('idle')
       })
     return promise
@@ -312,11 +401,39 @@ export function installSync(db: AppDatabase, modelManager: ModelManager): () => 
     }
   })
 
-  // Let callers (e.g. turning AI off) abort a running pass too — release any
-  // paused waiters first so the loop can exit.
-  return () => {
+  // Persisted run history for the Runs page. The list is summaries; steps are
+  // loaded per run, and come back shaped exactly like the live AgentTraceEvent
+  // so the page renders a past run with the same timeline components.
+  ipcMain.handle('agent:runs:list', async (): Promise<IpcResult<AgentRunSummary[]>> => {
+    try {
+      return ok(await listAgentRuns(db, MAX_RUN_HISTORY))
+    } catch (error) {
+      return fail(error)
+    }
+  })
+
+  ipcMain.handle(
+    'agent:run:steps',
+    async (_event, runId: unknown): Promise<IpcResult<AgentRunStep[]>> => {
+      try {
+        if (typeof runId !== 'number' || !Number.isInteger(runId))
+          return fail('runId must be an integer')
+        return ok(await getAgentRunSteps(db, runId))
+      } catch (error) {
+        return fail(error)
+      }
+    },
+  )
+
+  // Let callers (e.g. turning AI off, or app quit) abort a running pass too —
+  // release any paused waiters first so the loop can exit, then AWAIT the pass
+  // actually unwinding. Quit disposes the native model right after this returns,
+  // and disposing a llama context while a generation is still in flight aborts
+  // the process (SIGABRT). AI-off callers can ignore the promise.
+  return async () => {
     paused = false
     releaseResume()
     activeController?.abort()
+    await running?.catch(() => {})
   }
 }

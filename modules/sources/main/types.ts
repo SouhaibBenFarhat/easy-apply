@@ -1,5 +1,5 @@
 import type { Logger } from '@logger'
-import type { NormalizedJob, SearchProfile, SourceId } from '@sources/shared'
+import type { MailScanConfig, NormalizedJob, SearchProfile, SourceId } from '@sources/shared'
 import type { PoliteHttpClient } from './http'
 import type { MailAccount, MailDriver } from './mail'
 import type { LlmClient } from './mail-extract'
@@ -67,14 +67,24 @@ export interface AgentTraceJob {
   id: string
   title: string
   company: string
+  location: string | null // city, or the raw place; null when unknown
+  source: string // the board it came from, display-cased (LinkedIn, Inbox, …)
   url: string // the posting, opened externally through the window guards
 }
+
+// The outcome of a step, STATED by the code that emits it — never guessed from
+// the label. 'in-progress' is a render-only state (the newest row while the
+// agent is running); emitters only ever state a settled outcome, defaulting to
+// 'done'. Mirrored in src/preload/electron-api.d.ts.
+export type TraceStatus = 'done' | 'failed' | 'skipped'
 
 // One line in the agent's live activity trace (surfaced in the header panel).
 // seq/at are stamped by the broadcaster; callers supply the rest.
 export interface AgentTraceInput {
   channel: 'sync' | 'mailbox' | 'llm' | 'pipeline' | 'thinking'
   label: string
+  // Step outcome. Omitted means 'done' — only failures and skips say so.
+  status?: TraceStatus
   body?: string // the full prompt/response/reasoning text
   chars?: number // context load (prompt/response size)
   stats?: AgentPipelineStats // funnel counts, on 'pipeline' events
@@ -105,6 +115,9 @@ export interface FetchContext {
   // provider then skips quietly.
   createMail?: (account: MailAccount) => MailDriver
   llm?: LlmClient
+  // The user's first-sweep filters (enabled domains + subject keywords, and the
+  // disabled domains that hard-exclude). Provided for the mailbox source.
+  mailScan?: MailScanConfig
   // Live activity trace for the header monitor (no-op when not wired).
   trace?: TraceFn
   // Aborts a long provider run (email scan) between units of work — the user's
