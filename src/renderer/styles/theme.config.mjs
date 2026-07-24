@@ -36,7 +36,9 @@ export const lightTokens = {
   'interactive-active': { role: 'neutral', l: 0.9, c: 0.014 },
   primary: { role: 'primary', l: 0.55, c: 0.12 },
   'primary-foreground': { role: 'neutral', l: 0.995, c: 0 },
-  input: { role: 'neutral', l: 0.958, c: 0.008 },
+  // Pure white — a crisp white field on the gray cards (surface-raised 0.944),
+  // the strongest clean contrast in light mode without a disabled-gray fill.
+  input: { role: 'neutral', l: 1.0, c: 0 },
   ring: { role: 'primary', l: 0.55, c: 0.12 },
   success: { role: 'success', l: 0.52, c: 0.12 },
   'success-foreground': { role: 'neutral', l: 0.995, c: 0 },

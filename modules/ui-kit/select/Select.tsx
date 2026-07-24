@@ -34,7 +34,7 @@ export function SelectTrigger({
     <SelectPrimitive.Trigger
       type={type}
       className={cn(
-        'flex h-9 w-full items-center justify-between rounded border border-border bg-input',
+        'field-recess flex h-9 w-full items-center justify-between rounded border border-border bg-input',
         'px-3 py-2 text-sm transition-colors duration-fast',
         'data-[placeholder]:text-foreground-subtle',
         'focus:outline-none focus:ring-1 focus:ring-ring',
