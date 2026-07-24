@@ -26,7 +26,7 @@
   --interactive-active: 0.9 0.014 215;
   --primary: 0.55 0.12 60;
   --primary-foreground: 0.995 0 215;
-  --input: 0.958 0.008 215;
+  --input: 1 0 215;
   --ring: 0.55 0.12 60;
   --success: 0.52 0.12 155;
   --success-foreground: 0.995 0 215;
@@ -231,6 +231,35 @@
 
   .app-no-drag {
     -webkit-app-region: no-drag;
+  }
+
+  /*
+   * Recessed form field. The tonal step between a field and the card it sits on
+   * is tiny at the top of the light ladder (white→cards is ~0.056 across four
+   * levels), so fill alone can't carry the depth without going gray enough to
+   * look disabled. An inset top shadow does — the one place a shadow earns its
+   * keep on an interactive control. Focus re-states the ring alongside it, since
+   * both are box-shadows and the ring would otherwise be clobbered.
+   */
+  .field-recess {
+    box-shadow:
+      inset 0 1px 1px 0 oklch(var(--foreground) / 0.1),
+      inset 0 2px 4px -1px oklch(var(--foreground) / 0.06);
+  }
+  .field-recess:focus-visible {
+    box-shadow:
+      0 0 0 3px oklch(var(--ring) / 0.4),
+      inset 0 1px 2px 0 oklch(var(--foreground) / 0.1);
+  }
+  .dark .field-recess {
+    box-shadow:
+      inset 0 1px 2px 0 rgb(0 0 0 / 0.4),
+      inset 0 2px 5px -1px rgb(0 0 0 / 0.28);
+  }
+  .dark .field-recess:focus-visible {
+    box-shadow:
+      0 0 0 3px oklch(var(--ring) / 0.4),
+      inset 0 1px 2px 0 rgb(0 0 0 / 0.4);
   }
 
   /* Micro-caps metadata label (company · location · posted · source). */
