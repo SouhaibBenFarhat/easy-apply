@@ -17,6 +17,16 @@ export {
   type WorkMode,
 } from './job'
 export {
+  DEFAULT_MAIL_SCAN_CONFIG,
+  isExcludedSender,
+  isIncludedSender,
+  type MailScanConfig,
+  type MailScanDomain,
+  resolveMailScanConfig,
+  subjectMatchesKeywords,
+  validateMailScanConfig,
+} from './mail-scan'
+export {
   DEFAULT_SEARCH_PROFILE,
   REMOTE_SCOPES,
   type RemoteScope,

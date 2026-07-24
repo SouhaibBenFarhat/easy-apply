@@ -21,7 +21,7 @@ the renderer. Everything flows one way:
 │  (30-min tick, manual Sync now)   (engine.ts)  (BA, Arbeitnow,   │
 │                                                Himalayas,        │
 │                                                RemoteOK, WWR,    │
-│                                                Adzuna)           │
+│                                                mailbox)          │
 │      raw JSON/RSS ─▶ zod validate ─▶ normalize ─▶ classify       │
 │                    ─▶ dedupe ─▶ upsert PGlite (Drizzle)          │
 │  IPC handles: db:* sources:* sync:* settings:*                   │
@@ -149,8 +149,9 @@ is small: `node_modules/@electric-sql/pglite` is asar-unpacked and the
 - Job description HTML is sanitized with a DOMPurify allowlist before render
   (formatting tags only); anchor clicks in the detail pane are intercepted and
   forwarded to `shell.openExternal`.
-- Adzuna keys are `safeStorage`-encrypted at rest; decrypted values never
-  cross the bridge (`SourceInfo.hasKey` is a boolean by design).
+- Provider credentials (e.g. the inbox agent's Gmail App Password) are
+  `safeStorage`-encrypted at rest; decrypted values never cross the bridge
+  (`SourceInfo.hasKey` is a boolean by design).
 
 ## Where to look
 

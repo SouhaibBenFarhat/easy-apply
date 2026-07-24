@@ -7,7 +7,8 @@ const ROUTE_BY_KEY: Readonly<Record<string, string>> = {
   '1': '/feed',
   '2': '/tracker',
   '3': '/sources',
-  '4': '/settings',
+  '4': '/runs',
+  '5': '/settings',
 }
 
 function isTextTarget(target: EventTarget | null): boolean {

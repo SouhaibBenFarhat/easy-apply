@@ -54,7 +54,7 @@ export interface MailDriver {
 }
 
 // The encrypted mail-connection config (stored via safeStorage, never
-// plaintext — the same at-rest treatment as Adzuna's key). Gmail:
+// plaintext — the safeStorage-encrypted at-rest treatment). Gmail:
 // host 'imap.gmail.com', port 993, secure true, user the address, password the
 // 16-char App Password.
 export interface MailAccount {

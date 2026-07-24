@@ -136,7 +136,7 @@ export function FeedPage(): ReactElement {
             sourceNames={sourceNames}
           />
         )}
-        <footer className="label-caps shrink-0 border-t border-border bg-surface-hover px-3 py-2">
+        <footer className="glass-panel label-caps shrink-0 border-t border-border px-3 py-2">
           {jobs.length} {jobs.length === 1 ? 'job' : 'jobs'}
         </footer>
       </div>

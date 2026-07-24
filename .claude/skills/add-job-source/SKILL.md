@@ -19,7 +19,7 @@ the closest template.
    `JobSourceProvider`:
    - `meta`: `id`, `displayName`, `homepage`, `enabledByDefault` (keyless →
      `true`), `attribution` (check the source's ToS — RemoteOK/Himalayas/
-     Adzuna require it), `politeness` (`minIntervalMinutes`,
+     require it), `politeness` (`minIntervalMinutes`,
      `maxRequestsPerSync` — the budget lives HERE, nowhere else), and
      `requiresKey.fields` if the source needs credentials.
    - `fetch(ctx)`: raw pages/feeds via `ctx.http` (PoliteHttpClient — browser

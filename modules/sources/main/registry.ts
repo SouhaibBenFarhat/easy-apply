@@ -1,5 +1,4 @@
 import type { SourceId } from '@sources/shared'
-import { adzunaProvider } from './providers/adzuna'
 import { arbeitnowProvider } from './providers/arbeitnow'
 import { baProvider } from './providers/ba'
 import { himalayasProvider } from './providers/himalayas'
@@ -9,16 +8,15 @@ import { wwrProvider } from './providers/wwr'
 import type { JobSourceProvider, ProviderMeta } from './types'
 
 // The provider registry. Adding a source touches exactly: its provider file,
-// its schema, this array, one fixture, one test (PLAN.md §4.3). PR 6 landed the
-// German anchors (BA, Arbeitnow), PR 7 the remote boards (Himalayas, RemoteOK,
-// WWR), PR 8 Adzuna (the keyed Munich salary source).
+// its schema, this array, one fixture, one test (PLAN.md §4.3). The German
+// anchors (BA, Arbeitnow), the remote boards (Himalayas, RemoteOK, WWR), and the
+// on-device inbox agent (mailbox).
 export const PROVIDERS: readonly JobSourceProvider[] = [
   baProvider,
   arbeitnowProvider,
   himalayasProvider,
   remoteokProvider,
   wwrProvider,
-  adzunaProvider,
   mailboxProvider,
 ]
 

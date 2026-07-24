@@ -1,6 +1,31 @@
-import { act, createTestQueryClient, renderHook, waitFor } from '@test-utils'
+import type { SourceInfo } from '@data'
+import {
+  act,
+  createMockElectron,
+  createTestQueryClient,
+  renderHook,
+  setupMockElectron,
+  waitFor,
+} from '@test-utils'
 import { keys } from '../keys'
 import { useClearSourceKey, useSetSourceEnabled, useSetSourceKey } from './sources'
+
+// A reserved keyed source to exercise the generic key flow (no registered API
+// provider is keyed — the inbox agent uses its own guided card).
+const keyedSource: SourceInfo = {
+  sourceId: 'jooble',
+  displayName: 'Jooble',
+  homepage: 'https://jooble.org',
+  enabledByDefault: false,
+  enabled: false,
+  lastSyncAt: null,
+  hasKey: false,
+  requiresKey: { fields: [{ id: 'api_key', label: 'API key', hint: 'from jooble.org' }] },
+  attribution: { label: 'Jooble', required: false },
+}
+function seedKeyedSource(): void {
+  setupMockElectron(createMockElectron({ sources: [keyedSource] }))
+}
 
 describe('useSetSourceEnabled', () => {
   it('toggles the source and invalidates the source list', async () => {
@@ -18,13 +43,14 @@ describe('useSetSourceEnabled', () => {
 
 describe('useSetSourceKey', () => {
   it('stores the key (enabling the source) and invalidates the list', async () => {
+    seedKeyedSource()
     const client = createTestQueryClient()
     client.setQueryData(keys.sources.list, [])
     const { result } = renderHook(() => useSetSourceKey(), { client })
     act(() => {
       result.current.mutate({
-        sourceId: 'adzuna',
-        values: { app_id: 'id', app_key: 'key' },
+        sourceId: 'jooble',
+        values: { api_key: 'key' },
       })
     })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
@@ -45,11 +71,12 @@ describe('useSetSourceKey', () => {
 
 describe('useClearSourceKey', () => {
   it('clears the key and invalidates the list', async () => {
+    seedKeyedSource()
     const client = createTestQueryClient()
     client.setQueryData(keys.sources.list, [])
     const { result } = renderHook(() => useClearSourceKey(), { client })
     act(() => {
-      result.current.mutate({ sourceId: 'adzuna' })
+      result.current.mutate({ sourceId: 'jooble' })
     })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(result.current.data?.hasKey).toBe(false)

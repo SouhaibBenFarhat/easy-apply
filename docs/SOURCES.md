@@ -18,7 +18,6 @@ budget lives in code, not in prose):
 | Himalayas | 60 | 3 | **yes** |
 | RemoteOK | 120 | 1 | **yes** |
 | WeWorkRemotely | 120 | 2 | no |
-| Adzuna | 60 | 4 | **yes** ("Jobs by Adzuna") |
 
 On top of that, `PoliteHttpClient` (`modules/sources/main/http.ts`) spaces
 consecutive requests (1.2s gap during sync), sends a browser user agent,
@@ -101,25 +100,6 @@ design.
 - Same browser-UA note as RemoteOK. Salary: essentially never structured
   (1 of 16 sampled items, prose only).
 
-## Adzuna — `providers/adzuna.ts`
-
-- The **only Munich source with systematic salary numbers**. Requires a free
-  `app_id`/`app_key` pair from developer.adzuna.com → `enabledByDefault:
-  false`; keys are safeStorage-encrypted and decrypted only in the main
-  process.
-- For Germany most numbers are **model-predicted**: `salary_is_predicted`
-  (arrives as string `'1'`/`'0'` live, number in docs — both accepted) maps to
-  `salary.isEstimated`, rendered as "~ est." in the feed. `salary_min/max` of
-  0 means "no data".
-- **Free-tier limits**: 25 hits/min, 250/day, **1,000/week** (the binding
-  constraint), 2,500/month. The politeness budget (4 requests/sync, hourly
-  minimum interval) stays far inside them.
-- Quirks: the page number is a **path segment** (`/search/1`), not a query
-  param; the key travels in the query string, so **log messages must never
-  include the URL**.
-- The committed fixture is **synthetic** (`adzuna.synthetic.json`) — the live
-  endpoint answers `AUTH_FAIL` without a key.
-
 ## Re-capturing fixtures
 
 Fixtures live in `modules/test-utils/fixtures/`. Re-capture when a provider
@@ -151,10 +131,6 @@ curl -s -A "$UA" 'https://remoteok.com/api' > remoteok.json
 
 # WeWorkRemotely (browser UA required; the programming feed is the fixture)
 curl -s -A "$UA" 'https://weworkremotely.com/categories/remote-programming-jobs.rss' > wwr.rss
-
-# Adzuna (needs your own key pair; replaces the synthetic fixture)
-curl -s "https://api.adzuna.com/v1/api/jobs/de/search/1?app_id=$APP_ID&app_key=$APP_KEY&what=software&where=M%C3%BCnchen&distance=25&results_per_page=50&sort_by=date&max_days_old=30" \
-  > adzuna.json
 ```
 
 `muse.json` and `landingjobs.json` are Tier-2 captures (The Muse,

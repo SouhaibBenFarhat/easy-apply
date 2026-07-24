@@ -12,7 +12,7 @@ const completed: SyncEvent = {
 }
 
 describe('useSyncEventInvalidation', () => {
-  it('invalidates jobs, sync status and sources on sync:completed', () => {
+  it('invalidates jobs, sync status, sources and run history on sync:completed', () => {
     const emit = createSyncEventEmitter(window.electron)
     const client = createTestQueryClient()
     const spy = vi.spyOn(client, 'invalidateQueries')
@@ -25,7 +25,9 @@ describe('useSyncEventInvalidation', () => {
     expect(spy).toHaveBeenCalledWith({ queryKey: keys.jobs.all })
     expect(spy).toHaveBeenCalledWith({ queryKey: keys.sync.status })
     expect(spy).toHaveBeenCalledWith({ queryKey: keys.sources.list })
-    expect(spy).toHaveBeenCalledTimes(3)
+    // The just-finished run is now in history.
+    expect(spy).toHaveBeenCalledWith({ queryKey: keys.agent.runs })
+    expect(spy).toHaveBeenCalledTimes(4)
   })
 
   it('ignores non-completed events', () => {

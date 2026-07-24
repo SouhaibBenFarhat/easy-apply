@@ -63,7 +63,7 @@ export function FilterBar({ filters, sources, onChange }: FilterBarProps): React
     // opens the salary / source controls. `surface-hover` chrome + full border.
     // px-3 matches the job cards' 12px gutter so header and list share one
     // left/right grid line.
-    <div className="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b border-border bg-surface-hover px-3 py-2">
+    <div className="glass-panel sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
       <Tabs
         value={workModeTab(filters.workModes)}
         onValueChange={(value) => {

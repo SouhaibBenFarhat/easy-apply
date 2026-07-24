@@ -37,14 +37,14 @@ describe('readStoredFeedFilters', () => {
       JSON.stringify({
         workModes: ['remote'],
         hasSalary: true,
-        sources: ['ba', 'adzuna'],
+        sources: ['ba', 'jooble'],
         origin: 'agent',
       }),
     )
     expect(readStoredFeedFilters()).toEqual({
       workModes: ['remote'],
       hasSalary: true,
-      sources: ['ba', 'adzuna'],
+      sources: ['ba', 'jooble'],
       origin: 'agent',
     })
   })

@@ -7,9 +7,9 @@ describe('useSources', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     const ids = result.current.data?.map((info) => info.sourceId)
     expect(ids).toContain('ba')
-    expect(ids).toContain('adzuna')
+    expect(ids).toContain('himalayas')
     expect(ids).toContain('mailbox')
-    expect(result.current.data?.length).toBe(7)
+    expect(result.current.data?.length).toBe(6)
   })
 
   it('surfaces an IpcResult failure as a query error', async () => {

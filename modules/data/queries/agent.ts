@@ -1,7 +1,11 @@
 import type { UseQueryResult } from '@tanstack/react-query'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
-import type { AgentState } from '../../../src/preload/electron-api'
+import type {
+  AgentRunSummary,
+  AgentState,
+  AgentTraceEvent,
+} from '../../../src/preload/electron-api'
 import { unwrap } from '../ipc'
 import { keys } from '../keys'
 
@@ -26,6 +30,31 @@ export function useAgentState(): UseQueryResult<AgentState, Error> {
     queryKey: keys.agent.state,
     queryFn: async () => unwrap(await window.electron.agent.state()),
     // Pushes are the update path; a refetch would only ever confirm them.
+    staleTime: Number.POSITIVE_INFINITY,
+  })
+}
+
+// Persisted run history for the Runs page. A completed sync invalidates this
+// (use-sync-events), so a finished run appears without a manual refresh.
+export function useAgentRuns(): UseQueryResult<AgentRunSummary[], Error> {
+  return useQuery({
+    queryKey: keys.agent.runs,
+    queryFn: async () => unwrap(await window.electron.agent.runs()),
+  })
+}
+
+// The steps of one past run, shaped as trace events so the Runs page renders
+// them with the same timeline components as the live panel. Disabled until a
+// run is selected.
+export function useAgentRunSteps(runId: number | null): UseQueryResult<AgentTraceEvent[], Error> {
+  return useQuery({
+    queryKey: keys.agent.runSteps(runId ?? -1),
+    queryFn: async () => {
+      if (runId === null) throw new Error('useAgentRunSteps ran without a run id')
+      return unwrap(await window.electron.agent.runSteps(runId))
+    },
+    enabled: runId !== null,
+    // A finished run is immutable — its steps never change once written.
     staleTime: Number.POSITIVE_INFINITY,
   })
 }

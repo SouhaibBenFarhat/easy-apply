@@ -44,23 +44,29 @@ function renderFunnel(
 }
 
 describe('PipelineFunnel', () => {
-  it('renders progress and the funnel counts', () => {
+  it('renders progress and the jobs counts (the headline row)', () => {
     renderFunnel()
 
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '40')
     expect(screen.getByText('4 / 10')).toBeInTheDocument()
-    expect(screen.getByText('Accepted')).toBeInTheDocument()
-    expect(screen.getByText('Rejected')).toBeInTheDocument()
-    expect(screen.getByText('Found')).toBeInTheDocument()
+    // Jobs is always shown…
+    expect(screen.getByText('Jobs found')).toBeInTheDocument()
     expect(screen.getByText('Kept')).toBeInTheDocument()
+    // …the email funnel is folded away until expanded.
+    expect(screen.queryByText('Accepted')).not.toBeInTheDocument()
+    expect(screen.queryByText('Rejected')).not.toBeInTheDocument()
   })
 
-  // The counters mix two units — emails on one row, jobs on the other — which
-  // is unreadable unless the grid says so.
-  it('groups the counters under their unit', () => {
+  // The email funnel is secondary — behind a disclosure, revealed on demand.
+  it('reveals the email counts when the Emails disclosure is expanded', async () => {
     renderFunnel()
-    expect(screen.getByText('Emails')).toBeInTheDocument()
-    expect(screen.getByText('Jobs')).toBeInTheDocument()
+    const toggle = screen.getByRole('button', { name: /Emails/ })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+
+    await userEvent.setup().click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('Accepted')).toBeInTheDocument()
+    expect(screen.getByText('Rejected')).toBeInTheDocument()
   })
 
   it('shows the email currently under analysis', () => {

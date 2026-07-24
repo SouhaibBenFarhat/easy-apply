@@ -32,15 +32,15 @@ describe('provider state', () => {
   })
 
   it('setProviderEnabled inserts on first call and toggles afterwards', async () => {
-    const created = await setProviderEnabled(db, 'adzuna', false)
+    const created = await setProviderEnabled(db, 'jooble', false)
     expect(created).toEqual({
-      sourceId: 'adzuna',
+      sourceId: 'jooble',
       enabled: false,
       lastSyncAt: null,
       configJson: null,
     })
 
-    const toggled = await setProviderEnabled(db, 'adzuna', true)
+    const toggled = await setProviderEnabled(db, 'jooble', true)
     expect(toggled.enabled).toBe(true)
     expect(await getProviderStates(db)).toHaveLength(1)
   })
@@ -89,11 +89,12 @@ describe('provider state', () => {
 
   it('lists states ordered by sourceId', async () => {
     await setProviderEnabled(db, 'wwr', true)
-    await setProviderEnabled(db, 'adzuna', false)
+    await setProviderEnabled(db, 'jooble', false)
     await setProviderEnabled(db, 'ba', true)
+    // Ordered by sourceId ascending: ba < jooble < wwr.
     expect((await getProviderStates(db)).map((state) => state.sourceId)).toEqual([
-      'adzuna',
       'ba',
+      'jooble',
       'wwr',
     ])
   })

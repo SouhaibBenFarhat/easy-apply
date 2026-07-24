@@ -21,7 +21,7 @@ export function Sidebar({
   version = '0.1.0',
 }: SidebarProps): ReactElement {
   return (
-    <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-background">
+    <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-surface-raised">
       {/* Traffic-light zone = the LEFT half of the window's glass header bar:
           the SAME `.glass` material as the app header (§sidebars), so the top
           chrome row is one unified band — neither half outranks the other. */}

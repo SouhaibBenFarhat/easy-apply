@@ -1,5 +1,5 @@
-import type { SearchProfile } from '@sources/shared'
-import { DEFAULT_SEARCH_PROFILE } from '@sources/shared'
+import type { MailScanConfig, SearchProfile } from '@sources/shared'
+import { DEFAULT_MAIL_SCAN_CONFIG, DEFAULT_SEARCH_PROFILE } from '@sources/shared'
 import Store from 'electron-store'
 
 interface WindowBounds {
@@ -18,6 +18,10 @@ interface StoreSchema {
   // Message-ids the mailbox agent has already scanned — so a sync only runs the
   // LLM on NEW mail. Capped (most-recent-wins) to bound growth.
   processedMailIds: string[]
+  // First-sweep filters for the inbox agent (editable on the Sources page):
+  // which sender domains and subject keywords mark job mail, and which domains
+  // are turned off (hard-excluded).
+  mailScan: MailScanConfig
 }
 
 export const store: Store<StoreSchema> = new Store<StoreSchema>({
@@ -29,6 +33,7 @@ export const store: Store<StoreSchema> = new Store<StoreSchema>({
     // The selected local model — the fast instruct model by default.
     modelId: 'llama-3.1-8b-instruct-q4',
     processedMailIds: [],
+    mailScan: DEFAULT_MAIL_SCAN_CONFIG,
   },
 })
 

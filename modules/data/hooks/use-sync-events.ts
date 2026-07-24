@@ -29,5 +29,7 @@ export function useSyncEventInvalidation(): void {
     void client.invalidateQueries({ queryKey: keys.jobs.all })
     void client.invalidateQueries({ queryKey: keys.sync.status })
     void client.invalidateQueries({ queryKey: keys.sources.list })
+    // The just-finished run is now in history — refresh the Runs list.
+    void client.invalidateQueries({ queryKey: keys.agent.runs })
   })
 }

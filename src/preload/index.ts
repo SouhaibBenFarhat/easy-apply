@@ -86,6 +86,8 @@ const api = {
     stop: () => ipcRenderer.invoke('agent:stop'),
     pause: () => ipcRenderer.invoke('agent:pause'),
     resume: () => ipcRenderer.invoke('agent:resume'),
+    runs: () => ipcRenderer.invoke('agent:runs:list'),
+    runSteps: (runId: number) => ipcRenderer.invoke('agent:run:steps', runId),
   },
 }
 

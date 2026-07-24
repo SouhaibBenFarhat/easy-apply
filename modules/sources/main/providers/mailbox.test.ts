@@ -1,5 +1,6 @@
 // @vitest-environment node
 import type { Logger } from '@logger'
+import type { MailScanConfig } from '@sources/shared'
 import { DEFAULT_SEARCH_PROFILE } from '@sources/shared'
 import { describe, expect, it } from 'vitest'
 import type { PoliteHttpClient } from '../http'
@@ -250,6 +251,50 @@ describe('mailboxProvider.fetch', () => {
 
   // Triage is the whole point of the rework: an email that isn't job mail must
   // never reach the (slow) extraction call, and its body must never be
+  // A domain turned OFF on the Sources page is hard-excluded: its emails are
+  // never downloaded, triaged, extracted, or remembered — so nothing changes
+  // for them and they simply don't produce jobs.
+  it('hard-excludes emails from a disabled domain', async () => {
+    const log: DriverLog = { fetchedUids: [] }
+    const prompts: string[] = []
+    const ctx = makeCtx(
+      accounts,
+      [
+        msg(1, 'jobs@linkedin.com', 'LINKEDIN alert'),
+        msg(2, 'noreply@stepstone.de', 'STEPSTONE alert'),
+      ],
+      true,
+      undefined,
+      log,
+    )
+    // LinkedIn OFF, StepStone ON.
+    const mailScan: MailScanConfig = {
+      domains: [
+        { domain: 'linkedin.', enabled: false },
+        { domain: 'stepstone.', enabled: true },
+      ],
+      keywords: [],
+    }
+    ctx.mailScan = mailScan
+    ctx.llm = {
+      complete: async (prompt) => {
+        prompts.push(prompt)
+        return JSON.stringify([
+          { title: 'SS role', company: 'Beta', applyUrl: 'https://stepstone.de/2' },
+        ])
+      },
+    }
+
+    const payloads = await mailboxProvider.fetch(ctx)
+    const jobs = mailboxProvider.parse(payloads[0] ?? { kind: 'jobs', body: '[]' }, ctx)
+
+    // Only the StepStone email was downloaded and scanned; LinkedIn never was.
+    expect(log.fetchedUids).toEqual([2])
+    expect(jobs.map((job) => job.sourceId)).toEqual(['stepstone'])
+    // The LinkedIn email never reached extraction (its subject never appears).
+    expect(prompts.some((p) => p.includes('LINKEDIN'))).toBe(false)
+  })
+
   // downloaded either.
   it('skips non-job mail before downloading or extracting it', async () => {
     const log: DriverLog = { fetchedUids: [] }

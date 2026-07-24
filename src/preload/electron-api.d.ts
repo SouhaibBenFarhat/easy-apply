@@ -5,6 +5,7 @@ import type {
   FeedFilters,
   IpcResult,
   JobStatus,
+  MailScanConfig,
   SearchProfile,
   SourceId,
   StoredJob,
@@ -13,6 +14,7 @@ import type {
 export interface AppSettings {
   searchProfile: SearchProfile
   syncIntervalHours: number
+  mailScan: MailScanConfig
 }
 
 // Mirrors modules/persistence/main/repositories/provider-state.ts — duplicated
@@ -153,7 +155,32 @@ export interface AgentTraceJob {
   id: string
   title: string
   company: string
+  location: string | null
+  source: string
   url: string
+}
+
+// Mirrors modules/sources/main/types.ts — a step's stated outcome. 'in-progress'
+// is render-only (the newest row while running); emitters state only settled
+// outcomes, defaulting to 'done'.
+export type TraceStatus = 'done' | 'failed' | 'skipped'
+
+// Mirrors modules/persistence/main/repositories/agent-runs.ts — one persisted
+// run in the history list.
+export type AgentRunStatus = 'running' | 'completed' | 'stopped' | 'failed'
+export type AgentRunTrigger = 'manual' | 'scheduled'
+
+export interface AgentRunSummary {
+  id: number
+  startedAt: string
+  finishedAt: string | null
+  status: AgentRunStatus
+  trigger: AgentRunTrigger
+  emailsTotal: number
+  emailsProcessed: number
+  jobsKept: number
+  error: string | null
+  stepCount: number
 }
 
 // Mirrors src/main/sync.ts — one line in the agent's live activity trace.
@@ -162,6 +189,7 @@ export interface AgentTraceEvent {
   at: string
   channel: 'sync' | 'mailbox' | 'llm' | 'pipeline' | 'thinking'
   label: string
+  status?: TraceStatus
   body?: string
   chars?: number
   stats?: AgentPipelineStats
@@ -254,6 +282,10 @@ export interface ElectronAPI {
     // Hold / resume the running scan between emails.
     readonly pause: () => Promise<IpcResult<boolean>>
     readonly resume: () => Promise<IpcResult<boolean>>
+    // Persisted run history (Runs page). Steps come back as trace events so a
+    // past run renders with the same timeline components as the live panel.
+    readonly runs: () => Promise<IpcResult<AgentRunSummary[]>>
+    readonly runSteps: (runId: number) => Promise<IpcResult<AgentTraceEvent[]>>
   }
 }
 

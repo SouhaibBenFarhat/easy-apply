@@ -7,8 +7,8 @@ import {
   upsertJobs,
   upsertProviderState,
 } from '@persistence/main'
-import type { SearchProfile, SourceId } from '@sources/shared'
-import { describeError } from '@sources/shared'
+import type { MailScanConfig, SearchProfile, SourceId } from '@sources/shared'
+import { DEFAULT_MAIL_SCAN_CONFIG, describeError } from '@sources/shared'
 import type { PoliteHttpClient } from './http'
 import type { MailAccount, MailDriver } from './mail'
 import type { LlmClient } from './mail-extract'
@@ -64,6 +64,9 @@ export interface SyncDeps {
   providers: readonly JobSourceProvider[]
   readConfig: (sourceId: SourceId) => Promise<Record<string, string>>
   getSearchProfile: () => Promise<SearchProfile>
+  // The user's first-sweep mail filters, read fresh each pass (like the search
+  // profile). Optional: absent falls back to the provider's own default.
+  getMailScan?: () => Promise<MailScanConfig>
   createHttp: (meta: ProviderMeta) => PoliteHttpClient
   logger: Logger
   emit?: (event: SyncEvent) => void
@@ -99,6 +102,7 @@ export async function runSync(
   const states = await getProviderStates(db)
   const stateById = new Map(states.map((state) => [state.sourceId, state]))
   const searchProfile = await deps.getSearchProfile()
+  const mailScan = (await deps.getMailScan?.()) ?? DEFAULT_MAIL_SCAN_CONFIG
 
   const perSource: SyncSummary['perSource'] = []
   const failed: SourceId[] = []
@@ -147,6 +151,7 @@ export async function runSync(
         logger,
         createMail: deps.createMail,
         llm: deps.llm,
+        mailScan,
         trace: deps.trace,
         signal: deps.signal,
         isPaused: deps.isPaused,
@@ -225,6 +230,7 @@ export async function runSync(
       deps.trace?.({
         channel: 'sync',
         label: `${meta.displayName} failed — sync aborted for this source`,
+        status: 'failed',
         body: message,
       })
       emit({

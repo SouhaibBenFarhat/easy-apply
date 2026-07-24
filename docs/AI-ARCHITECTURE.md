@@ -3,7 +3,7 @@
 EasyApply pulls jobs from **two kinds of source** and merges them into one
 deduplicated feed:
 
-1. **Job-board APIs** — Arbeitsagentur, RemoteOK, Adzuna, Arbeitnow, Himalayas,
+1. **Job-board APIs** — Arbeitsagentur, RemoteOK, Arbeitnow, Himalayas,
    WeWorkRemotely, … — structured JSON/RSS, parsed deterministically.
 2. **Your inbox** — a local LLM reads your Gmail and extracts postings from
    job-alert emails (the "agent").
@@ -24,7 +24,7 @@ the code.
 ```mermaid
 flowchart TD
   subgraph src["Ingestion sources"]
-    APIs["Job-board APIs<br/>(Arbeitsagentur, RemoteOK,<br/>Adzuna, Arbeitnow, …)"]
+    APIs["Job-board APIs<br/>(Arbeitsagentur, RemoteOK,<br/>Arbeitnow, Himalayas, …)"]
     Inbox["Gmail inbox<br/>(IMAP · All Mail)"]
   end
 
@@ -142,11 +142,16 @@ flowchart TD
 3. **Triage** (`modules/sources/main/mail-triage.ts`). Extraction costs a full
    LLM generation per email, and that cost is flat whether the email holds 25
    jobs or none — the model still reasons its way to "no jobs". Triage decides
-   from headers alone which emails deserve it:
-   - **Deterministic first**: a known job-board sender (`linkedin.`,
-     `instaffo.`, `glassdoor.`, …) or a job word in the subject. Free, instant.
-   - **Then the model**, one batched call per chunk of 40, over only what stage
-     one could not decide. It answers with row numbers, not text.
+   from headers alone which emails deserve it, driven by a **user-editable
+   config** (`modules/sources/shared/mail-scan.ts`, managed on the Sources page,
+   persisted in electron-store):
+   - **Hard exclusion first**: a sender on a domain the user turned **off** is
+     dropped before anything — never downloaded, triaged, or extracted, so no
+     new jobs come from it (already-found jobs stay). `isExcludedSender`.
+   - **Deterministic include**: an enabled job-sender domain (`linkedin.`,
+     `instaffo.`, …) or a subject keyword the user configured. Free, instant.
+   - **Then the model**, one batched call per chunk of 40, over only what the
+     first two stages could not decide. It answers with row numbers, not text.
    > **Sender may include, never exclude.** An unrecognized sender is not
    > dropped — it goes to the model. And every failure path (unreadable answer,
    > failed call, aborted run, no model at all) **keeps** the mail. A filter that
@@ -273,6 +278,24 @@ state without polling.
 - **Renderer** — TanStack Query is the single source of truth; the feed reads
   `db:jobs:list` and renders the virtualized list. Agent and API jobs are
   interleaved, deduped, newest-first.
+
+### Run history
+
+The live trace is an in-memory push, but every pass is also persisted so it
+survives a restart (`modules/persistence/main/repositories/agent-runs.ts`):
+
+- **`agent_runs`** — one row per pass: start/finish, `status`
+  (running/completed/stopped/failed), `trigger`, and the email/job rollup.
+- **`agent_run_steps`** — one row per trace event, **FK to `agent_runs`
+  (cascade)**, storing the full event *including the prompt/response body*, so a
+  past run re-renders with the very same timeline components (`TraceRowList`).
+
+`src/main/sync.ts` opens a run before the first step, appends each step as it
+emits (best-effort, fire-and-forget so a DB write never stalls the live push),
+and closes it as completed/stopped/failed. History is capped at 50 runs
+(`pruneAgentRuns`); a run left `running` by a crash is reconciled to `stopped`
+on next launch (`reconcileStaleRuns`). The **Runs page** (`modules/app`, key
+⌘4) lists runs and re-opens any run's timeline read-only.
 
 ---
 

@@ -4,7 +4,7 @@ import type { SidebarNavItem } from '@shell'
 import { AppHeader, Sidebar } from '@shell'
 import { Outlet, useRouter, useRouterState } from '@tanstack/react-router'
 import { ResizeHandle, Toaster, TooltipProvider, TransportControl } from '@ui-kit'
-import { ClipboardList, Plug, Rss, Settings } from 'lucide-react'
+import { ClipboardList, History, Plug, Rss, Settings } from 'lucide-react'
 import { type ReactElement, useState } from 'react'
 import { AgentMonitorButton } from './AgentMonitorButton'
 import { AgentTimeline } from './AgentTimeline'
@@ -17,6 +17,7 @@ const NAV_ITEMS: SidebarNavItem[] = [
   { to: '/feed', label: 'Feed', icon: <Rss /> },
   { to: '/tracker', label: 'Tracker', icon: <ClipboardList /> },
   { to: '/sources', label: 'Sources', icon: <Plug /> },
+  { to: '/runs', label: 'Runs', icon: <History /> },
   { to: '/settings', label: 'Settings', icon: <Settings /> },
 ]
 

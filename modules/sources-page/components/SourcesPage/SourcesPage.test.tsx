@@ -1,8 +1,58 @@
 import type { SourceInfo, SyncRun } from '@data'
-import { act, fireEvent, render, renderHook, screen, userEvent, waitFor } from '@test-utils'
+import {
+  act,
+  createMockElectron,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+  setupMockElectron,
+  userEvent,
+  waitFor,
+} from '@test-utils'
 import { dismiss, Toaster, useToast } from '@ui-kit'
 import type { ReactElement } from 'react'
 import { SourcesPage } from './SourcesPage'
+
+// No registered API source is keyed anymore (the inbox agent uses its own
+// guided card), so the generic SourceCard key flow is exercised through a
+// reserved keyed source. Seeded alongside the mailbox card so both the "Save
+// key" form and the inbox's "Add account" button are present.
+const keyedSource: SourceInfo = {
+  sourceId: 'jooble',
+  displayName: 'Jooble',
+  homepage: 'https://jooble.org',
+  enabledByDefault: false,
+  enabled: false,
+  lastSyncAt: null,
+  hasKey: false,
+  requiresKey: {
+    fields: [
+      { id: 'app_id', label: 'Application ID', hint: 'from jooble.org' },
+      { id: 'app_key', label: 'Application key', hint: 'from jooble.org' },
+    ],
+  },
+  attribution: { label: 'Jooble', required: false },
+}
+const mailboxSource: SourceInfo = {
+  sourceId: 'mailbox',
+  displayName: 'Job-alert inbox',
+  homepage: 'https://mail.google.com',
+  enabledByDefault: false,
+  enabled: false,
+  lastSyncAt: null,
+  hasKey: false,
+  requiresKey: {
+    fields: [
+      { id: 'email', label: 'Gmail address', hint: 'you@gmail.com' },
+      { id: 'app_password', label: 'App password', hint: 'paste the 16-character code' },
+    ],
+  },
+  attribution: { label: 'Your inbox', required: false },
+}
+function seedKeyed(): void {
+  setupMockElectron(createMockElectron({ sources: [keyedSource, mailboxSource] }))
+}
 
 afterEach(() => {
   vi.useRealTimers()
@@ -30,7 +80,6 @@ const REGISTRY_ORDER = [
   'Himalayas',
   'RemoteOK',
   'WeWorkRemotely',
-  'Adzuna',
   'Job-alert inbox',
 ] as const
 
@@ -60,15 +109,18 @@ describe('SourcesPage', () => {
       await screen.findByText("Sources sync sequentially and respect each provider's rate limits."),
     ).toBeInTheDocument()
     const headings = screen.getAllByRole('heading', { level: 3 })
-    expect(headings.map((heading) => heading.textContent)).toEqual([...REGISTRY_ORDER])
-    expect(screen.getByRole('link', { name: 'Open Adzuna' })).toHaveAttribute(
+    // The provider cards in registry order, then the email-scan-filters card.
+    expect(headings.map((heading) => heading.textContent)).toEqual([
+      ...REGISTRY_ORDER,
+      'Email scan filters',
+    ])
+    expect(screen.getByRole('link', { name: 'Open Himalayas' })).toHaveAttribute(
       'href',
-      'https://www.adzuna.de',
+      'https://himalayas.app',
     )
     // Nothing has synced yet in the seeded mock — every meta line says so.
-    expect(screen.getAllByText(/Never synced/)).toHaveLength(7)
+    expect(screen.getAllByText(/Never synced/)).toHaveLength(6)
     expect(screen.getByRole('switch', { name: 'Enable Arbeitsagentur' })).toBeChecked()
-    expect(screen.getByRole('switch', { name: 'Enable Adzuna' })).not.toBeChecked()
   })
 
   it('shows the last sync as relative time once a source has synced', async () => {
@@ -83,7 +135,7 @@ describe('SourcesPage', () => {
     render(<Page />)
 
     expect(await screen.findByText(/Synced 1 hour ago/)).toBeInTheDocument()
-    expect(screen.getAllByText(/Never synced/)).toHaveLength(6)
+    expect(screen.getAllByText(/Never synced/)).toHaveLength(5)
   })
 
   it('toggling a switch calls sources.setEnabled', async () => {
@@ -97,24 +149,20 @@ describe('SourcesPage', () => {
   })
 
   it('renders a key form per keyed source, gates save on all fields, and toasts', async () => {
+    seedKeyed()
     const setKey = vi.spyOn(window.electron.sources, 'setKey')
     const user = userEvent.setup()
     render(<Page />)
 
-    await screen.findByRole('heading', { level: 3, name: 'Adzuna' })
-    // Adzuna keeps its "Save key" form; the mail inbox is a separate guided
-    // card with an "Add account" button and a link to Google App Passwords.
+    await screen.findByRole('heading', { level: 3, name: 'Jooble' })
+    // The keyed source keeps its "Save key" form; the mail inbox is a separate
+    // guided card with an "Add account" button and a Google App Passwords link.
     expect(screen.getByRole('button', { name: 'Save key' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add account' })).toBeInTheDocument()
     // The inbox's App Passwords link routes through Google's account chooser.
     expect(
       screen.getByRole('link', { name: 'Open Google App Passwords' }).getAttribute('href'),
     ).toContain('accounts.google.com/AccountChooser')
-    expect(
-      screen.getByText(
-        'Free key from developer.adzuna.com — the only Munich source with salary data.',
-      ),
-    ).toBeInTheDocument()
 
     const save = screen.getByRole('button', { name: 'Save key' })
     expect(save).toBeDisabled()
@@ -125,20 +173,21 @@ describe('SourcesPage', () => {
 
     await user.click(save)
     await waitFor(() =>
-      expect(setKey).toHaveBeenCalledExactlyOnceWith('adzuna', {
+      expect(setKey).toHaveBeenCalledExactlyOnceWith('jooble', {
         app_id: 'my-app-id',
         app_key: 'my-app-key',
       }),
     )
-    expect(await screen.findByText('Key saved — Adzuna enabled')).toBeInTheDocument()
+    expect(await screen.findByText('Key saved — Jooble enabled')).toBeInTheDocument()
     // setKey enables the source and stores the key; the refetched card
-    // collapses Adzuna's form into the configured row.
+    // collapses the form into the configured row.
     expect(await screen.findByText('API key configured')).toBeInTheDocument()
     expect(screen.queryByLabelText('Application ID')).not.toBeInTheDocument()
-    expect(screen.getByRole('switch', { name: 'Enable Adzuna' })).toBeChecked()
+    expect(screen.getByRole('switch', { name: 'Enable Jooble' })).toBeChecked()
   })
 
   it('shows a destructive toast when saving the key fails', async () => {
+    seedKeyed()
     vi.spyOn(window.electron.sources, 'setKey').mockResolvedValue({
       success: false,
       error: 'safeStorage unavailable',
@@ -155,7 +204,8 @@ describe('SourcesPage', () => {
   })
 
   it('clearing the key requires the armed confirm click', async () => {
-    await window.electron.sources.setKey('adzuna', { app_id: 'a', app_key: 'b' })
+    seedKeyed()
+    await window.electron.sources.setKey('jooble', { app_id: 'a', app_key: 'b' })
     const clearKey = vi.spyOn(window.electron.sources, 'clearKey')
     const user = userEvent.setup()
     render(<Page />)
@@ -165,13 +215,14 @@ describe('SourcesPage', () => {
     expect(clearKey).not.toHaveBeenCalled()
 
     await user.click(screen.getByRole('button', { name: 'Confirm clear' }))
-    await waitFor(() => expect(clearKey).toHaveBeenCalledExactlyOnceWith('adzuna'))
+    await waitFor(() => expect(clearKey).toHaveBeenCalledExactlyOnceWith('jooble'))
     // Key gone → the entry form is back.
     expect(await screen.findByLabelText('Application ID')).toBeInTheDocument()
   })
 
   it('disarms the clear confirmation after the timeout', async () => {
-    await window.electron.sources.setKey('adzuna', { app_id: 'a', app_key: 'b' })
+    seedKeyed()
+    await window.electron.sources.setKey('jooble', { app_id: 'a', app_key: 'b' })
     const clearKey = vi.spyOn(window.electron.sources, 'clearKey')
     render(<Page />)
     await screen.findByRole('button', { name: 'Clear' })
@@ -188,13 +239,14 @@ describe('SourcesPage', () => {
   })
 
   it('replace key toggles the entry form while keeping the configured row', async () => {
-    await window.electron.sources.setKey('adzuna', { app_id: 'a', app_key: 'b' })
+    seedKeyed()
+    await window.electron.sources.setKey('jooble', { app_id: 'a', app_key: 'b' })
     const user = userEvent.setup()
     render(<Page />)
 
-    // Only Adzuna has a key here, so Replace key is unique to its card; scope
-    // the form-toggle assertions to Adzuna's unique field (the mailbox card
-    // always shows its own Save key form).
+    // Only the keyed source has a key here, so Replace key is unique to its
+    // card; scope the form-toggle assertions to its unique field (the mailbox
+    // card always shows its own Save key form).
     const replace = await screen.findByRole('button', { name: 'Replace key' })
     expect(screen.queryByLabelText('Application ID')).not.toBeInTheDocument()
     await user.click(replace)
